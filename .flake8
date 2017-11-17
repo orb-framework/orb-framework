@@ -1,0 +1,6 @@
+[flake8]
+ignore=
+  D107  # missing docstring in __init__  (covered by class docstring)
+  H238  # old style class (not applicable in py3)
+  H301  # one import per line
+  H306  # alphabetical import (using I100 from flake8-import-order plugin instead)

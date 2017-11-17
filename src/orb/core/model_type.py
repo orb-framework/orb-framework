@@ -7,33 +7,32 @@ from .schema import Schema
 
 def parse_schema_info(classes: list) -> Tuple[list, dict, dict, dict]:
     """Iterate over class list to find schemas."""
+    inherits = []
     collectors = {}
     fields = {}
     indexes = {}
-    inherits = []
 
     for cls in classes:
-        for subcls in cls.__bases__:
-            (
-                sub_inherits,
-                sub_collectors,
-                sub_fields,
-                sub_indexes
-            ) = parse_schema_info(subcls)
+        (
+            sub_inherits,
+            sub_collectors,
+            sub_fields,
+            sub_indexes
+        ) = parse_schema_info(cls.__bases__)
 
-            inherits.extend(sub_inherits)
-            collectors.update(sub_collectors)
-            fields.update(sub_fields)
-            indexes.update(sub_indexes)
+        inherits.extend(sub_inherits)
+        collectors.update(sub_collectors)
+        fields.update(sub_fields)
+        indexes.update(sub_indexes)
 
-        if type(cls, ModelType):
+        if type(cls) is ModelType and cls.__schema__:
             inherits.append(cls.__schema__)
-        elif type(cls, MixinType):
+        elif type(cls) is MixinType:
             sub_collectors.update(cls.__collectors__)
             sub_fields.update(cls.__fields__)
             sub_indexes.update(cls.__indexes__)
 
-    return inherits, fields, indexes, inherits
+    return inherits, fields, indexes, indexes
 
 
 class ModelType(type):

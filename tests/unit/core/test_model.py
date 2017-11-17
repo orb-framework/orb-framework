@@ -42,4 +42,5 @@ async def test_model_gather_nested_values(make_users):
     """Test gathering multiple values which can be nested."""
     john, jane = make_users('john', 'jane')
     await john.set('manager', jane)
-    assert await john.gather('username', 'manager.username') == ['john', 'jane']
+    result = await john.gather('username', 'manager.username')
+    assert result == ['john', 'jane']
