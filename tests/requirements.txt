@@ -1,0 +1,6 @@
+tox
+pytest
+pytest-mock
+pytest-asyncio
+requests-mock
+coverage
