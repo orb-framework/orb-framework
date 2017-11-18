@@ -15,19 +15,19 @@ class Collection:
         'last',
     }
 
-    def __init__(self, state=None):
-        self.__state = state
+    def __init__(self, records=None):
+        self.__records = records
 
     def __len__(self):
         """Return length of this collection."""
-        if self.__state is not None:
-            return len(self.__state)
+        if self.__records is not None:
+            return len(self.__records)
         return 0
 
     async def get_count(self) -> int:
         """Return the size of the collection."""
-        if self.__state is not None:
-            return len(self.__state)
+        if self.__records is not None:
+            return len(self.__records)
         return 0
 
     async def get(self, key: str, default: Any=None) -> Any:
@@ -52,27 +52,27 @@ class Collection:
 
     async def get_first(self) -> Any:
         """Return the first record in the collection."""
-        if self.__state is not None:
+        if self.__records is not None:
             try:
-                return self.__state[0]
+                return self.__records[0]
             except IndexError:
                 return None
         return None
 
     async def get_last(self) -> Any:
         """Return the last record in the collection."""
-        if self.__state is not None:
+        if self.__records is not None:
             try:
-                return self.__state[-1]
+                return self.__records[-1]
             except IndexError:
                 return None
         return None
 
     async def get_values(self, key: str, default: Any=None) -> tuple:
         """Return a list of values from each record in the collection."""
-        if self.__state is not None:
+        if self.__records is not None:
             return await asyncio.gather(*(
-                record.get(key, default) for record in self.__state
+                record.get(key, default) for record in self.__records
             ))
         return tuple()
 
@@ -84,8 +84,8 @@ class Collection:
             return target.set(value_key, value)
         elif value_key in Collection.RESERVED_WORDS:
             raise ReadOnly(value_key)
-        elif self.__state:
+        elif self.__records:
             await asyncio.gather(*(
                 record.set(key, value)
-                for record in self.__state
+                for record in self.__records
             ))

@@ -1,11 +1,11 @@
 """Define Field class."""
 
 import re
-from enum import Flag, auto
+from enum import IntFlag, auto
 from typing import Any
 
 
-class Flags(Flag):
+class FieldFlags(IntFlag):
     """Flag options for fields."""
 
     AutoAssign = auto()
@@ -29,14 +29,14 @@ class Flags(Flag):
 class Field:
     """Data class type for models."""
 
-    Flags = Flags
+    Flags = FieldFlags
 
     def __init__(
         self,
         *,
         code: str='',
         default: Any=None,
-        flags: Flags=Flags(0),
+        flags: Flags=FieldFlags(0),
         gettermethod: callable=None,
         label: str='',
         name: str='',
@@ -99,14 +99,14 @@ class Field:
         """Set display text label."""
         self._label = label
 
-    def querymethod(self, func: callable) -> callable:
+    def query(self, func: callable) -> callable:
         """Set the querymethod property via decorator."""
-        self.gettermethod = func
+        self.querymethod = func
         return func
 
-    def settermethod(self, func: callable) -> callable:
+    def setter(self, func: callable) -> callable:
         """Set the settermethod property via decorator."""
-        self.gettermethod = func
+        self.settermethod = func
         return func
 
     def test_flag(self, flag: Flags) -> bool:

@@ -22,11 +22,12 @@ class Schema:
         return output
 
     @property
-    def default_state(self) -> dict:
+    def default_values(self) -> dict:
         """Return defualt values for this model's fields."""
         return {
             field.name: field.default
             for field in self.fields.values()
+            if not field.test_flag(field.Flags.Virtual)
         }
 
     @property

@@ -6,7 +6,6 @@ from typing import Any, Dict, Tuple
 from .collection import Collection
 from .model_type import ModelType
 from ..exceptions import ReadOnly
-from ..utils import ensure_instance_of
 
 
 class Model(metaclass=ModelType):
@@ -17,24 +16,49 @@ class Model(metaclass=ModelType):
     __store__ = None
     __view__ = False
 
-    def __init__(self, key: Any=None, state: dict=None):
-        defaults = self.__schema__.default_state
-        defaults.update(state or {})
-        self.__fields = {
-            f: defaults[f] for f in self.__schema__.fields if f in defaults
-        }
+    def __init__(self, key: Any=None, values: dict=None, state: dict=None):
+        self.__state = {}
         self.__changes = {}
-        self.__collections = {
-            c: ensure_instance_of(defaults[c], Collection)
-            for c in self.__schema__.collectors if c in defaults
-        }
+        self.__collections = {}
+
+        # apply base state
+        fields, collections = self._get_props(state, as_state=True)
+        self.__state.update(self.__schema__.default_values)
+        self.__state.update(fields)
+        self.__collections.update(collections)
+
+        # apply overrides
+        fields, collections = self._get_props(values)
+        self.__changes.update(fields)
+        self.__collections.update(collections)
+
+    def _get_props(self, values: dict, as_state: bool=False):
+        if not values:
+            return {}, {}
+
+        schema = self.__schema__
+        fields = {}
+        collections = {}
+        for key, value in values.items():
+            field = schema.fields.get(key)
+            if field:
+                if not field.test_flag(field.Flags.Virtual):
+                    fields[key] = value
+            else:
+                collector = self.__schema__.collectors[key]
+                collections[key] = collector.make_collection(
+                    value,
+                    as_state=as_state
+                )
+
+        return fields, collections
 
     async def delete(self):
         """Delete this record from it's store."""
         if type(self).__view__:
             raise ReadOnly(type(self).__name__)
         else:
-            self.__store__.delete_record(self)
+            return await self.__store__.delete_record(self)
 
     async def gather(self, *keys, state: dict=None) -> tuple:
         """Return a list of values for the given keys."""
@@ -52,7 +76,7 @@ class Model(metaclass=ModelType):
         except KeyError:
             result = await self.get_collection(curr_key, default)
 
-        if next_key and result:
+        if next_key and result is not None:
             return await result.get(next_key)
         return result
 
@@ -77,8 +101,9 @@ class Model(metaclass=ModelType):
             try:
                 return self.__changes[key]
             except KeyError:
-                return self.__fields.get(key, default)
+                return self.__state.get(key, default)
 
+    @property
     def local_changes(self) -> Dict[str, Tuple[Any, Any]]:
         """Return a set of changes for this model.
 
@@ -88,13 +113,29 @@ class Model(metaclass=ModelType):
         the field, and the (old, new) value.
         """
         return {
-            key: (self.__fields[key], self.__changes[key])
+            key: (self.__state.get(key), self.__changes[key])
             for key in self.__changes
         }
 
+    def mark_loaded(self):
+        """Stash changes to the local state."""
+        self.__state.update(self.__changes)
+        self.__changes.clear()
+
+    async def reset(self):
+        """Reset the local changes on this model."""
+        self.__changes.clear()
+
     async def save(self):
         """Save this model to the store."""
-        self.__store__.save_record(self)
+        if type(self).__view__:
+            raise ReadOnly(type(self).__name__)
+        elif self.__changes:
+            values = await self.__store__.save_record(self)
+            self.__changes.update(values)
+            self.mark_loaded()
+            return True
+        return False
 
     async def set(self, key: str, value: Any):
         """Set the value for the given key."""
@@ -103,8 +144,8 @@ class Model(metaclass=ModelType):
             field = self.__schema__.fields[field_key]
 
             if field.settermethod:
-                return field.settermethod(self, field_key, value)
-            elif self.__fields[field_key] is not value:
+                return await field.settermethod(self, value)
+            elif self.__state.get(field_key) is not value:
                 self.__changes[field_key] = value
             else:
                 self.__changes.pop(field_key)
@@ -117,12 +158,12 @@ class Model(metaclass=ModelType):
         await asyncio.gather(*(self.set(*item) for item in values.items()))
 
     @classmethod
-    async def create(cls, state: dict) -> object:
+    async def create(cls, values: dict) -> object:
         """Create a new record in the store with the given state."""
         if cls.__view__:
             raise ReadOnly(cls.__name__)
         else:
-            record = cls(state=state)
+            record = cls(values=values)
             await record.save()
             return record
 
@@ -135,3 +176,14 @@ class Model(metaclass=ModelType):
     async def select(cls) -> Collection:
         """Lookup a collection of records from the store."""
         pass
+
+    @classmethod
+    def find_model(cls, name):
+        """Find subclass model by name."""
+        for sub_cls in cls.__subclasses__():
+            if sub_cls.__name__ == name:
+                return sub_cls
+            found = sub_cls.find_model(name)
+            if found:
+                return found
+        return None
