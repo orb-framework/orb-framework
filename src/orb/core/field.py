@@ -4,6 +4,8 @@ import re
 from enum import IntFlag, auto
 from typing import Any
 
+from ..utils import enum_from_set
+
 
 class FieldFlags(IntFlag):
     """Flag options for fields."""
@@ -34,7 +36,7 @@ class Field:
     def __init__(
         self,
         *,
-        code: str='',
+        code: str=None,
         default: Any=None,
         flags: Flags=FieldFlags(0),
         gettermethod: callable=None,
@@ -46,7 +48,10 @@ class Field:
     ):
         self._code = code
         self._default = default
-        self.flags = flags
+        self.flags = (
+            enum_from_set(FieldFlags, flags)
+            if type(flags) is set else flags
+        )
         self.gettermethod = gettermethod
         self._label = label
         self.name = name
@@ -61,10 +66,14 @@ class Field:
         be used.  The code will be used as the
         backend identifier.
         """
-        return self._code or self.make_code(self.name)
+        if callable(self._code):
+            return self._code(self)
+        return self._code or self.name
 
     def get_default(self) -> Any:
         """Return default value for this field."""
+        if callable(self._default):
+            return self._default(self)
         return self._default
 
     def get_label(self) -> str:
@@ -82,10 +91,6 @@ class Field:
         """Set the gettermethod property via decorator."""
         self.gettermethod = func
         return func
-
-    def make_code(self, name: str) -> str:
-        """Generate code from name."""
-        return name
 
     def set_code(self, code: str):
         """Set code for this field."""
@@ -114,5 +119,5 @@ class Field:
         return bool(self.flags & flag)
 
     code = property(get_code, set_code)
-    default = property(get_default)
+    default = property(get_default, set_default)
     label = property(get_label, set_label)
