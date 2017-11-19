@@ -13,15 +13,32 @@ class Store:
         self.backend = backend
         self.models = {}
 
-    def add_model(self, model: Type[Model]):
-        """Associate given model to this store."""
-        self.models[model.__name__] = model
-        model.__store__ = self
-
     def delete_record(self, record: Model) -> int:
         """Delete the record from the store."""
+        if self.backend is None:
+            raise RuntimeError('Store requires backend.')
         return self.backend.delete_record(record)
 
     def delete_collection(self, collection: Collection) -> int:
         """Delete the collection from the backend."""
+        if self.backend is None:
+            raise RuntimeError('Store requires backend.')
         return self.backend.delete_collection(collection)
+
+    def register(self, model: Type[Model]):
+        """Associate given model to this store."""
+        self.models[model.__name__] = model
+        model.__store__ = self
+        return model
+
+    def save_record(self, record: Model) -> dict:
+        """Save the record to the store backend."""
+        if self.backend is None:
+            raise RuntimeError('Store requires backend.')
+        return self.backend.save_record(record)
+
+    def save_collection(self, collection: Collection) -> list:
+        """Save the collection to the store backend."""
+        if self.backend is None:
+            raise RuntimeError('Store requires backend.')
+        return self.backend.save_collection(collection)

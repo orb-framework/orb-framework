@@ -91,4 +91,7 @@ class ModelType(type):
         else:
             cls_attributes = attributes
 
-        return type.__new__(cls, clsname, superclasses, cls_attributes)
+        model = type.__new__(cls, clsname, superclasses, cls_attributes)
+        if model.__store__:
+            model.__store__.register(model)
+        return model

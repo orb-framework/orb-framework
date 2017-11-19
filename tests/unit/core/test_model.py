@@ -381,6 +381,19 @@ async def test_model_modification_by_update(make_users):
 
 
 @pytest.mark.asyncio
+async def test_model_set_collection():
+    """Test assigning a value to a collection."""
+    from orb import Model, Field
+
+    class User(Model):
+        employees = Field()
+
+    u = User()
+    await u.set('employees', [1, 2, 3])
+    assert await u.get('employees') == [1, 2, 3]
+
+
+@pytest.mark.asyncio
 async def test_model_modification_with_nesting(make_users):
     """Test update nested properties."""
     bob, sam = make_users('bob', 'sam')
@@ -424,14 +437,14 @@ async def test_model_modification_with_custom_setter():
 @pytest.mark.asyncio
 async def test_model_save():
     """Test saving a model."""
-    from orb import Model, Field
+    from orb import Model, Field, Store
 
-    class Store:
+    class Test:
         async def save_record(self, record: Model) -> str:
             return {'id': 1}
 
     class User(Model):
-        __store__ = Store()
+        __store__ = Store(backend=Test())
 
         id = Field()
         username = Field()
@@ -445,14 +458,14 @@ async def test_model_save():
 @pytest.mark.asyncio
 async def test_model_save_without_modification():
     """Test save without modifications."""
-    from orb import Model, Field
+    from orb import Model, Field, Store
 
-    class Store:
+    class Test:
         async def save_record(self, record: Model) -> str:
             return {'id': 1}
 
     class User(Model):
-        __store__ = Store()
+        __store__ = Store(backend=Test())
 
         id = Field()
         username = Field()
@@ -481,14 +494,14 @@ async def test_model_save_read_only():
 @pytest.mark.asyncio
 async def test_model_delete():
     """Test deleting a model."""
-    from orb import Model
+    from orb import Model, Store
 
-    class Store:
+    class Test:
         async def delete_record(self, record: Model) -> str:
             return 'deleted'
 
     class User(Model):
-        __store__ = Store()
+        __store__ = Store(backend=Test())
 
     u = User()
     assert await u.delete() == 'deleted'
@@ -511,14 +524,14 @@ async def test_model_delete_read_only():
 @pytest.mark.asyncio
 async def test_model_create():
     """Test creating a new model."""
-    from orb import Model, Field
+    from orb import Model, Field, Store
 
-    class Store:
+    class Test:
         async def save_record(self, record: Model) -> str:
             return {'id': 1}
 
     class User(Model):
-        __store__ = Store()
+        __store__ = Store(backend=Test())
 
         id = Field()
         username = Field()

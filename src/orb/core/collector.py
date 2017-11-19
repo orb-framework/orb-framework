@@ -45,25 +45,26 @@ class Collector:
         """Create collection for specific record."""
         if self.gettermethod:
             return await self.gettermethod(record)
-        return Collection()
+        return Collection(model=self._model, source=record)
 
-    def make_collection(
+    def get_collection(
         self,
-        value: Iterable,
-        as_state: bool=False
+        records: Iterable=None,
+        constructor: callable=None
     ) -> Collection:
         """Create new collection instance from value."""
-        if isinstance(value, Collection):
-            return value
+        if isinstance(records, Collection):
+            return records
 
         model = self.model
-        if model is not None:
-            key = 'state' if as_state else 'values'
-            return Collection([
-                data if type(data) is model else model(**{key: data})
-                for data in value
-            ])
-        return Collection(value)
+        constructor = constructor or (lambda x: model(values=x))
+        if model is not None and records:
+            records = [
+                record if type(record) is model else constructor(record)
+                for record in records
+            ]
+            return Collection(records=records, model=self._model)
+        return Collection(records=records, model=self._model)
 
     @property
     def model(self):

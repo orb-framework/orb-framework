@@ -3,25 +3,6 @@
 from enum import Flag
 
 
-def ensure_instance_of(obj: object, typ: type) -> object:
-    """Ensure obj is of type typ.
-
-    This method will check if the given object is of the given type.  If
-    it is, then it will return the object directly, if it is not, then
-    it will cast the object as the other type.
-
-    Example:
-
-        from orb.utils import ensure_instance_of
-
-        assert type(ensure_instance_of((1, 2), tuple)) is tuple
-        assert type(ensure_instance_of([1, 2], tuple)) is tuple
-    """
-    if not isinstance(obj, typ):
-        return typ(obj)
-    return obj
-
-
 def enum_from_set(flags: Flag, options: set) -> Flag:
     """Convert a set of strings to a bitwise flag instance.
 

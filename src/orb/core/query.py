@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Any
 
 
-class Op(Enum):
+class QueryOp(Enum):
     """Query operators."""
 
     Is = 'is'
@@ -14,12 +14,12 @@ class Op(Enum):
 class Query:
     """Python query language builder."""
 
-    Op = Op
+    Op = QueryOp
 
     def __init__(
         self,
         name: str='',
-        op: Op=Op.Is,
+        op: QueryOp=QueryOp.Is,
         value: Any=None,
     ):
         self.name = name
@@ -28,11 +28,11 @@ class Query:
 
     def __eq__(self, other):
         """Set op to Is and value to other."""
-        return self.clone({'op': Query.Op.Is, 'value': other})
+        return self.clone({'op': QueryOp.Is, 'value': other})
 
     def __ne__(self, other):
         """Set op to IsNot and value to other."""
-        return self.clone({'op': Query.Op.IsNot, 'value': other})
+        return self.clone({'op': QueryOp.IsNot, 'value': other})
 
     def clone(self, values: dict=None):
         """Copy current query and return new object."""

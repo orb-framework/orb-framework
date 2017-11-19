@@ -22,17 +22,24 @@ class Model(metaclass=ModelType):
         self.__collections = {}
 
         # apply base state
-        fields, collections = self._get_props(state, as_state=True)
+        cls = type(self)
+        fields, collections = self._parse_items(
+            state,
+            constructor=lambda x: cls(state=x)
+        )
         self.__state.update(self.__schema__.default_values)
         self.__state.update(fields)
         self.__collections.update(collections)
 
         # apply overrides
-        fields, collections = self._get_props(values)
+        fields, collections = self._parse_items(
+            values,
+            constructor=lambda x: cls(values=x)
+        )
         self.__changes.update(fields)
         self.__collections.update(collections)
 
-    def _get_props(self, values: dict, as_state: bool=False):
+    def _parse_items(self, values: dict, constructor: callable=None):
         if not values:
             return {}, {}
 
@@ -46,9 +53,9 @@ class Model(metaclass=ModelType):
                     fields[key] = value
             else:
                 collector = self.__schema__.collectors[key]
-                collections[key] = collector.make_collection(
-                    value,
-                    as_state=as_state
+                collections[key] = collector.get_collection(
+                    records=value,
+                    constructor=constructor
                 )
 
         return fields, collections
@@ -141,14 +148,20 @@ class Model(metaclass=ModelType):
         """Set the value for the given key."""
         target_key, _, field_key = key.rpartition('.')
         if not target_key:
-            field = self.__schema__.fields[field_key]
-
-            if field.settermethod:
-                return await field.settermethod(self, value)
-            elif self.__state.get(field_key) is not value:
-                self.__changes[field_key] = value
+            try:
+                field = self.__schema__.fields[field_key]
+            except KeyError:
+                coll = self.__schema__.collectors[field_key]
+                if coll and coll.settermethod:
+                    await coll.settermethod(self, value)
+                self.__collections[key] = value
             else:
-                self.__changes.pop(field_key)
+                if field.settermethod:
+                    return await field.settermethod(self, value)
+                elif self.__state.get(field_key) is not value:
+                    self.__changes[field_key] = value
+                else:
+                    self.__changes.pop(field_key)
         else:
             target = await self.get(target_key)
             await target.set(field_key, value)
