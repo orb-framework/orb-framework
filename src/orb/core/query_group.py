@@ -1,5 +1,8 @@
 """Define QueryGroup class."""
 from enum import Enum
+from typing import Union
+
+from .query import Query
 
 
 class QueryGroupOp(Enum):
@@ -25,47 +28,48 @@ class QueryGroup:
 
     def __and__(self, other):
         """Merge other query with this one."""
-        if not (self.is_null or other.is_null):
-            if other.op == QueryGroupOp.And:
-                if isinstance(other, QueryGroup):
-                    queries = self.queries + other.queries
-                else:
-                    queries = self.queries + [other]
-
-                return QueryGroup(
-                    op=QueryGroupOp.And,
-                    queries=queries
-                )
-            return QueryGroup(
-                op=QueryGroupOp.And,
-                queries=[self, other]
-            )
-        elif not other.is_null:
-            return other
-        return self
+        return make_query_group(self, other, QueryGroup.Op.And)
 
     def __or__(self, other):
         """Merge other query with this one."""
-        if not (self.is_null or other.is_null):
-            if other.op == QueryGroupOp.Or:
-                if isinstance(other, QueryGroup):
-                    queries = self.queries + other.queries
-                else:
-                    queries = self.queries + [other]
-
-                return QueryGroup(
-                    op=QueryGroupOp.Or,
-                    queries=queries
-                )
-            return QueryGroup(
-                op=QueryGroupOp.Or,
-                queries=[self, other]
-            )
-        elif not other.is_null:
-            return other
-        return self
+        return make_query_group(self, other, QueryGroup.Op.Or)
 
     @property
     def is_null(self):
         """Return whether or not this group is empty."""
         return len(self.queries) == 0
+
+
+def make_query_group(
+    left: Union[Query, QueryGroup],
+    right: Union[Query, QueryGroup],
+    op: QueryGroupOp
+):
+    """Create new query group by joining the left and right queries."""
+    is_left_group = isinstance(left, QueryGroup)
+    is_right_group = isinstance(right, QueryGroup)
+
+    if getattr(right, 'is_null', False):
+        return left
+    elif getattr(left, 'is_null', False):
+        return right
+    elif is_left_group and is_right_group and left.op == right.op == op:
+        return QueryGroup(
+            op=op,
+            queries=left.queries + right.queries
+        )
+    elif is_left_group and left.op == op:
+        return QueryGroup(
+            op=op,
+            queries=left.queries + [right]
+        )
+    elif is_right_group and right.op == op:
+        return QueryGroup(
+            op=op,
+            queries=[left] + right.queries
+        )
+
+    return QueryGroup(
+        op=op,
+        queries=[left, right]
+    )

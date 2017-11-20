@@ -3,8 +3,6 @@
 from enum import Enum
 from typing import Any
 
-from .query_group import QueryGroup
-
 
 class QueryOp(Enum):
     """Query operators."""
@@ -32,25 +30,13 @@ class Query:
 
     def __and__(self, other):
         """Join query with another."""
-        if not (self.is_null or getattr(other, 'is_null', False)):
-            return QueryGroup(
-                op=QueryGroup.Op.And,
-                queries=[self, other],
-            )
-        elif not getattr(other, 'is_null', False):
-            return other
-        return self
+        from .query_group import make_query_group, QueryGroupOp
+        return make_query_group(self, other, QueryGroupOp.And)
 
     def __or__(self, other):
         """Join query with another."""
-        if not (self.is_null or getattr(other, 'is_null', False)):
-            return QueryGroup(
-                op=QueryGroup.Op.Or,
-                queries=[self, other],
-            )
-        elif not getattr(other, 'is_null', False):
-            return other
-        return self
+        from .query_group import make_query_group, QueryGroupOp
+        return make_query_group(self, other, QueryGroupOp.Or)
 
     def __eq__(self, other):
         """Set op to Is and value to other."""
