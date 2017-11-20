@@ -1,7 +1,7 @@
 """Define Query class type."""
 
 from enum import Enum
-from typing import Any
+from typing import Any, Union
 
 
 class QueryOp(Enum):
@@ -28,21 +28,27 @@ class Query:
         self.op = op
         self.value = value
 
-    def __and__(self, other):
+    def __and__(
+        self,
+        other: Union['Query', 'QueryGroup'],
+    ) -> Union['Query', 'QueryGroup']:
         """Join query with another."""
         from .query_group import make_query_group, QueryGroupOp
         return make_query_group(self, other, QueryGroupOp.And)
 
-    def __or__(self, other):
+    def __or__(
+        self,
+        other: Union['Query', 'QueryGroup'],
+    ) -> Union['Query', 'QueryGroup']:
         """Join query with another."""
         from .query_group import make_query_group, QueryGroupOp
         return make_query_group(self, other, QueryGroupOp.Or)
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> 'Query':
         """Set op to Is and value to other."""
         return self.clone({'op': QueryOp.Is, 'value': other})
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> 'Query':
         """Set op to IsNot and value to other."""
         return self.clone({'op': QueryOp.IsNot, 'value': other})
 

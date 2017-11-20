@@ -2,8 +2,6 @@
 from enum import Enum
 from typing import Union
 
-from .query import Query
-
 
 class QueryGroupOp(Enum):
     """Define QueryGroupOp class type."""
@@ -41,8 +39,8 @@ class QueryGroup:
 
 
 def make_query_group(
-    left: Union[Query, QueryGroup],
-    right: Union[Query, QueryGroup],
+    left: Union['Query', QueryGroup],
+    right: Union['Query', QueryGroup],
     op: QueryGroupOp
 ):
     """Create new query group by joining the left and right queries."""

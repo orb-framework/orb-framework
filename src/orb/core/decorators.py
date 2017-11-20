@@ -3,7 +3,7 @@
 
 def virtual(cls, *args, **kw):
     """Generate a virtual member of the given class bound to a function."""
-    def wrapper(func):
+    def wrapper(func: callable):
         kw.setdefault('name', func.__name__)
         kw.setdefault('gettermethod', func)
 
