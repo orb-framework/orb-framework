@@ -36,16 +36,20 @@ class Collector:
         self.querymethod = querymethod
         self.settermethod = settermethod
 
+    async def collect_by_record(self, record: Model) -> Collection:
+        """Create collection for specific record."""
+        if self.gettermethod:
+            return await self.gettermethod(record)
+        return Collection(
+            collector=self,
+            model=self._model,
+            source=record,
+        )
+
     def getter(self, func: callable) -> callable:
         """Assign gettermethod via decorator."""
         self.gettermethod = func
         return func
-
-    async def get_by_record(self, record: Model) -> Collection:
-        """Create collection for specific record."""
-        if self.gettermethod:
-            return await self.gettermethod(record)
-        return Collection(model=self._model, source=record)
 
     def get_collection(
         self,
@@ -63,13 +67,21 @@ class Collector:
                 record if type(record) is model else constructor(record)
                 for record in records
             ]
-            return Collection(records=records, model=self._model)
-        return Collection(records=records, model=self._model)
+            return Collection(
+                collector=self,
+                model=self._model,
+                records=records,
+            )
+        return Collection(
+            collector=self,
+            model=self._model,
+            records=records,
+        )
 
     @property
     def model(self):
         """Return Model class instance associated with this collector."""
-        if self._model:
+        if type(self._model) is str:
             return Model.find_model(self._model)
         return None
 

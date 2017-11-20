@@ -3,6 +3,7 @@
 import asyncio
 from typing import Any
 
+from .context import make_context
 from ..exceptions import ReadOnly
 
 
@@ -18,12 +19,16 @@ class Collection:
     def __init__(
         self,
         *,
+        collector=None,
+        context=None,
         model=None,
         records=None,
         source=None,
         store=None,
         target=None
     ):
+        self.context = context
+        self.collector = collector
         self._model = model
         self._records = records
         self.source = source
@@ -35,6 +40,28 @@ class Collection:
         if self._records is not None:
             return len(self._records)
         return 0
+
+    async def add(self, record: object) -> object:
+        """Add given record to the collection."""
+        if self._records and record:
+            self._records.append(record)
+
+        if self.collector and record:
+            return await self.collector.add_record(self, record)
+
+        return None
+
+    async def create(self, values: dict) -> object:
+        """Create a new record for this collection."""
+        if self.collector:
+            return await self.collector.create_record(values)
+
+        elif self._records is not None:
+            record = self.model(values=values)
+            self._records.append(record)
+            return record
+
+        return None
 
     async def delete(self) -> int:
         """Delete the records in this collection from the store."""
@@ -90,13 +117,26 @@ class Collection:
             ))
         return []
 
+    def refine(self, **context):
+        """Refine this collection down with a new context."""
+        context.setdefault('context', self.context)
+        new_context = make_context(**context)
+        return Collection(
+            context=new_context,
+            collector=self.collector,
+            model=self._model,
+            source=self.source,
+            store=self.store,
+            target=self.target
+        )
+
     @property
     def model(self):
         """Return the model the records in this collection represent."""
         from .model import Model
-        if self._model:
+        if type(self._model) is str:
             return Model.find_model(self._model)
-        return None
+        return self._model
 
     async def save(self) -> int:
         """Delete the records in this collection from the store."""

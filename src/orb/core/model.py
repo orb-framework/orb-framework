@@ -4,6 +4,7 @@ import asyncio
 from typing import Any, Dict, Tuple
 
 from .collection import Collection
+from .context import make_context
 from .model_type import ModelType
 from ..exceptions import ReadOnly
 
@@ -95,7 +96,7 @@ class Model(metaclass=ModelType):
             return self.__collections[key]
         except KeyError:
             collector = self.__schema__.collectors[key]
-            collection = await collector.get_by_record(self)
+            collection = await collector.collect_by_record(self)
             self.__collections[key] = collection
             return collection
 
@@ -186,9 +187,13 @@ class Model(metaclass=ModelType):
         pass
 
     @classmethod
-    async def select(cls) -> Collection:
+    def select(cls, **context) -> Collection:
         """Lookup a collection of records from the store."""
-        pass
+        return Collection(
+            context=make_context(**context),
+            model=cls,
+            store=cls.__store__
+        )
 
     @classmethod
     def find_model(cls, name):
