@@ -1,7 +1,8 @@
 """Define the Context class."""
 from enum import Enum
+from typing import Union
 
-from .query import Query
+from .store import current_store
 
 
 class Ordering(Enum):
@@ -35,8 +36,9 @@ class Context:
         returning: ReturnType=ReturnType.Records,
         scope: dict=None,
         start: int=None,
+        store: Union['Store', str]=None,
         timezone: str=None,
-        where: Query=None,
+        where: 'Query'=None,
     ):
         self.distinct = distinct
         self.fields = fields
@@ -49,6 +51,7 @@ class Context:
         self.returning = returning
         self.scope = scope or {}
         self._start = start
+        self._store = store
         self.timezone = timezone
         self.where = where
 
@@ -62,6 +65,12 @@ class Context:
             return (self.page - 1) * (self.limit or 0)
         return self._start
 
+    def get_store(self) -> 'Store':
+        """Return the store associated with this context."""
+        if not self._store or type(self._store) is str:
+            return current_store(self._store)
+        return self._store
+
     def set_limit(self, limit: int=None):
         """Set limit for this context."""
         self._limit = limit
@@ -70,8 +79,13 @@ class Context:
         """Set start index for this context."""
         self._start = start
 
+    def set_store(self, store: 'Store'):
+        """Set local store property for this context."""
+        self._store = store
+
     limit = property(get_limit, set_limit)
     start = property(get_start, set_start)
+    store = property(get_store, set_store)
 
 
 def _merge_distinct(options: dict, base_context: Context) -> list:
@@ -159,7 +173,7 @@ def _merge_page_size(options: dict, base_context: Context) -> int:
         return base_context.page_size if base_context else None
 
 
-def _merge_query(options: dict, base_context: Context) -> Query:
+def _merge_query(options: dict, base_context: Context) -> 'Query':
     """Return new query based on input and context."""
     try:
         query = options['where']
@@ -202,6 +216,14 @@ def _merge_start(options: dict, base_context: Context) -> int:
         return base_context._start if base_context else None
 
 
+def _merge_store(options: dict, base_context: Context) -> 'Store':
+    """Return new store based on input and context."""
+    try:
+        return options['store']
+    except KeyError:
+        return base_context.store if base_context else None
+
+
 def _merge_timezone(options: dict, base_context: Context) -> str:
     """Return new timezone based on input and context."""
     try:
@@ -212,7 +234,9 @@ def _merge_timezone(options: dict, base_context: Context) -> str:
 
 def make_context(**options) -> Context:
     """Merge context options together."""
-    base_context = options.get('context')
+    base_context = options.pop('context', None)
+    if base_context and not options:
+        return base_context
     return Context(
         distinct=_merge_distinct(options, base_context),
         fields=_merge_fields(options, base_context),
@@ -225,6 +249,7 @@ def make_context(**options) -> Context:
         returning=_merge_returning(options, base_context),
         scope=_merge_scope(options, base_context),
         start=_merge_start(options, base_context),
+        store=_merge_store(options, base_context),
         timezone=_merge_timezone(options, base_context),
         where=_merge_query(options, base_context),
     )

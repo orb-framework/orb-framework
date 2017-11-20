@@ -443,14 +443,14 @@ async def test_model_save():
         async def save_record(self, record: Model) -> str:
             return {'id': 1}
 
-    class User(Model):
-        __store__ = Store(backend=Test())
+    store = Store(backend=Test())
 
+    class User(Model):
         id = Field()
         username = Field()
         password = Field()
 
-    u = User(values={'username': 'bob'})
+    u = User(values={'username': 'bob'}, store=store)
     assert await u.save() is True
     assert await u.gather('id', 'username') == [1, 'bob']
 
@@ -464,13 +464,13 @@ async def test_model_save_without_modification():
         async def save_record(self, record: Model) -> str:
             return {'id': 1}
 
-    class User(Model):
-        __store__ = Store(backend=Test())
+    store = Store(backend=Test())
 
+    class User(Model):
         id = Field()
         username = Field()
 
-    u = User(state={'username': 'bob'})
+    u = User(state={'username': 'bob'}, store=store)
     assert await u.save() is False
     await u.set('username', 'tom')
     assert await u.save() is True
@@ -500,10 +500,12 @@ async def test_model_delete():
         async def delete_record(self, record: Model) -> str:
             return 'deleted'
 
-    class User(Model):
-        __store__ = Store(backend=Test())
+    store = Store(backend=Test())
 
-    u = User()
+    class User(Model):
+        pass
+
+    u = User(store=store)
     assert await u.delete() == 'deleted'
 
 
@@ -530,14 +532,14 @@ async def test_model_create():
         async def save_record(self, record: Model) -> str:
             return {'id': 1}
 
-    class User(Model):
-        __store__ = Store(backend=Test())
+    store = Store(backend=Test())
 
+    class User(Model):
         id = Field()
         username = Field()
         password = Field()
 
-    user = await User.create({'username': 'jdoe'})
+    user = await User.create({'username': 'jdoe'}, store=store)
     assert await user.gather('id', 'username') == [1, 'jdoe']
 
 

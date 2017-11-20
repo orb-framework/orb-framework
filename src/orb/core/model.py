@@ -17,7 +17,15 @@ class Model(metaclass=ModelType):
     __store__ = None
     __view__ = False
 
-    def __init__(self, key: Any=None, values: dict=None, state: dict=None):
+    def __init__(
+        self,
+        key: Any=None,
+        values: dict=None,
+        state: dict=None,
+        **context,
+    ):
+        context.setdefault('store', type(self).__store__)
+        self.context = make_context(**context)
         self.__state = {}
         self.__changes = {}
         self.__collections = {}
@@ -66,7 +74,7 @@ class Model(metaclass=ModelType):
         if type(self).__view__:
             raise ReadOnly(type(self).__name__)
         else:
-            return await self.__store__.delete_record(self)
+            return await self.context.store.delete_record(self)
 
     async def gather(self, *keys, state: dict=None) -> tuple:
         """Return a list of values for the given keys."""
@@ -139,7 +147,7 @@ class Model(metaclass=ModelType):
         if type(self).__view__:
             raise ReadOnly(type(self).__name__)
         elif self.__changes:
-            values = await self.__store__.save_record(self)
+            values = await self.context.store.save_record(self)
             self.__changes.update(values)
             self.mark_loaded()
             return True
@@ -172,27 +180,27 @@ class Model(metaclass=ModelType):
         await asyncio.gather(*(self.set(*item) for item in values.items()))
 
     @classmethod
-    async def create(cls, values: dict) -> object:
+    async def create(cls, values: dict, **context) -> object:
         """Create a new record in the store with the given state."""
         if cls.__view__:
             raise ReadOnly(cls.__name__)
         else:
-            record = cls(values=values)
+            record = cls(values=values, **context)
             await record.save()
             return record
 
     @classmethod
-    async def fetch(cls, key: Any):
+    async def fetch(cls, key: Any, **context):
         """Fetch a single record from the store for the given key."""
         pass
 
     @classmethod
     def select(cls, **context) -> Collection:
         """Lookup a collection of records from the store."""
+        context.setdefault('store', cls.__store__)
         return Collection(
             context=make_context(**context),
             model=cls,
-            store=cls.__store__
         )
 
     @classmethod

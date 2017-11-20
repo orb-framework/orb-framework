@@ -20,19 +20,17 @@ class Collection:
         self,
         *,
         collector=None,
-        context=None,
         model=None,
         records=None,
         source=None,
-        store=None,
-        target=None
+        target=None,
+        **context,
     ):
-        self.context = context
+        self.context = make_context(**context)
         self.collector = collector
         self._model = model
         self._records = records
         self.source = source
-        self.store = store
         self.target = target
 
     def __len__(self):
@@ -43,8 +41,7 @@ class Collection:
 
     async def delete(self) -> int:
         """Delete the records in this collection from the store."""
-        store = self.store or self.model.__store__
-        return await store.delete_collection(self)
+        return await self.context.store.delete_collection(self)
 
     async def get_count(self) -> int:
         """Return the size of the collection."""
@@ -104,7 +101,6 @@ class Collection:
             collector=self.collector,
             model=self._model,
             source=self.source,
-            store=self.store,
             target=self.target
         )
 
@@ -118,8 +114,7 @@ class Collection:
 
     async def save(self) -> int:
         """Delete the records in this collection from the store."""
-        store = self.store or self.model.__store__
-        return await store.save_collection(self)
+        return await self.context.store.save_collection(self)
 
     async def set(self, key: str, value: Any):
         """Set the value for a given key on each record in the collection."""
