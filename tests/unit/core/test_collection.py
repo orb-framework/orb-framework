@@ -144,3 +144,20 @@ async def test_collection_save():
     coll = Collection(records=[1, 2, 3], store=store)
 
     assert await coll.save() == []
+
+
+def test_collection_refining():
+    """Test refining a collection down by merging contexts."""
+    from orb import Collection, make_context, Query as Q
+
+    q = Q('active') == True  # noqa: E712
+    coll = Collection(context=make_context(where=q))
+    assert coll.context.where.name == 'active'
+    assert coll.context.where.value is True
+
+    q2 = Q('username') == 'bob'
+    coll2 = coll.refine(where=q2)
+    assert coll.context.where.name == 'active'
+    assert coll2.context.where.queries[0].name == 'username'
+    assert coll2.context.where.queries[0].value == 'bob'
+    assert coll2.context.where.queries[1] is coll.context.where

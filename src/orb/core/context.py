@@ -1,6 +1,5 @@
 """Define the Context class."""
 from enum import Enum
-from typing import Union
 
 from .query import Query
 
@@ -30,28 +29,28 @@ class Context:
         locale: str=None,
         limit: int=None,
         namespace: str=None,
-        ordering: list=None,
+        order: list=None,
         page: int=None,
         page_size: int=None,
-        query: Query=None,
         returning: ReturnType=ReturnType.Records,
         scope: dict=None,
         start: int=None,
         timezone: str=None,
+        where: Query=None,
     ):
         self.distinct = distinct
         self.fields = fields
         self.locale = locale
         self._limit = limit
         self.namespace = namespace
-        self.ordering = ordering
+        self.order = order
         self.page = page
         self.page_size = page_size
-        self.query = query
         self.returning = returning
         self.scope = scope or {}
         self._start = start
         self.timezone = timezone
+        self.where = where
 
     def get_limit(self) -> int:
         """Return limit for this context."""
@@ -75,149 +74,157 @@ class Context:
     start = property(get_start, set_start)
 
 
-def _merge_distinct(distinct: list, context: Context) -> list:
+def _merge_distinct(options: dict, base_context: Context) -> list:
     """Return distinct joined from option and base context."""
-    if distinct:
-        return distinct
-    elif context:
-        return context.distinct
-    return None
+    try:
+        distinct = options['distinct']
+    except KeyError:
+        distinct = base_context.distinct if base_context else None
+    else:
+        if type(distinct) is str:
+            distinct = distinct.split(',')
+    return distinct
 
 
-def _merge_fields(fields: Union[str, list], context: Context) -> list:
+def _merge_fields(options: dict, base_context: Context) -> list:
     """Return new fields based on input and context."""
-    if type(fields) is str:
-        fields = fields.split(',')
-    if fields and context and context.fields:
-        context_fields = [f for f in context.fields if f not in fields]
-        return fields + context_fields
-    elif fields:
-        return fields
-    return context.fields if context else None
+    try:
+        fields = options['fields']
+    except KeyError:
+        fields = base_context.fields if base_context else None
+    else:
+        if type(fields) is str:
+            fields = fields.split(',')
+
+        if fields and base_context and base_context.fields:
+            base_fields = [f for f in base_context.fields if f not in fields]
+            return fields + base_fields
+    return fields
 
 
-def _merge_limit(limit: int, context: Context) -> int:
+def _merge_limit(options: dict, base_context: Context) -> int:
     """Return new limit based on input and context."""
-    if limit is not None:
-        return limit
-    return context._limit if context else None
+    try:
+        return options['limit']
+    except KeyError:
+        return base_context._limit if base_context else None
 
 
-def _merge_locale(locale: str, context: Context) -> str:
+def _merge_locale(options: dict, base_context: Context) -> str:
     """Return new locale based on input and context."""
-    if locale is not None:
-        return locale
-    return context.locale if context else None
+    try:
+        return options['locale']
+    except KeyError:
+        return base_context.locale if base_context else None
 
 
-def _merge_namespace(namespace: str, context: Context) -> str:
+def _merge_namespace(options: dict, base_context: Context) -> str:
     """Return new namespace based on input and context."""
-    if namespace is not None:
-        return namespace
-    return context.namespace if context else None
+    try:
+        return options['namespace']
+    except KeyError:
+        return base_context.namespace if base_context else None
 
 
-def _merge_ordering(ordering: Union[str, list], context: Context) -> list:
-    """Return new ordering based on input and context."""
-    if type(ordering) is str:
-        ordering = [
-            (
-                part.strip('+-'),
-                Ordering.Desc if part.startswith('-') else Ordering.Asc
-            ) for part in ordering.split(',')
-        ]
+def _merge_order(options: dict, base_context: Context) -> list:
+    """Return new order based on input and context."""
+    try:
+        order = options['order']
+    except KeyError:
+        order = base_context.order if base_context else None
+    else:
+        if type(order) is str:
+            order = [
+                (
+                    part.strip('+-'),
+                    Ordering.Desc if part.startswith('-') else Ordering.Asc
+                ) for part in order.split(',')
+            ]
+    return order
 
-    if ordering is not None:
-        return ordering
-    return context.ordering if context else None
 
-
-def _merge_page(page: int, context: Context) -> int:
+def _merge_page(options: dict, base_context: Context) -> int:
     """Return new page based on input and context."""
-    if page is not None:
-        return page
-    return context.page if context else None
+    try:
+        return options['page']
+    except KeyError:
+        return base_context.page if base_context else None
 
 
-def _merge_page_size(page_size: int, context: Context) -> int:
+def _merge_page_size(options: dict, base_context: Context) -> int:
     """Return new page size based on input and context."""
-    if page_size is not None:
-        return page_size
-    return context.page_size if context else None
+    try:
+        return options['page_size']
+    except KeyError:
+        return base_context.page_size if base_context else None
 
 
-def _merge_query(query: Query, context: Context) -> Query:
+def _merge_query(options: dict, base_context: Context) -> Query:
     """Return new query based on input and context."""
-    if query is not None and context and context.query is not None:
-        return query & context.query
-    elif query is not None:
-        return query
-    return context.query if context else None
+    try:
+        query = options['where']
+    except KeyError:
+        query = base_context.where if base_context else None
+    else:
+        if query is not None and base_context:
+            query &= base_context.where
+    return query
 
 
-def _merge_returning(returning: ReturnType, context: Context) -> ReturnType:
+def _merge_returning(options: dict, base_context: Context) -> ReturnType:
     """Return new returning based on input and context."""
-    if returning is not None:
-        return returning
-    return context.returning if context else ReturnType.Records
+    try:
+        return options['returning']
+    except KeyError:
+        return base_context.returning if base_context else ReturnType.Records
 
 
-def _merge_scope(scope: dict, context: Context) -> dict:
+def _merge_scope(options: dict, base_context: Context) -> dict:
     """Return new scope based on input and context."""
-    if scope and context and context.scope:
-        new_scope = {}
-        new_scope.update(context.scope)
-        new_scope.update(scope)
-        return new_scope
-    elif scope:
-        return scope
-    return context.scope if context else None
+    try:
+        scope = options['scope']
+    except KeyError:
+        scope = base_context.scope if base_context else None
+    else:
+        if scope and base_context:
+            new_scope = {}
+            new_scope.update(base_context.scope)
+            new_scope.update(scope)
+            return new_scope
+    return scope
 
 
-def _merge_start(start: int, context: Context) -> int:
+def _merge_start(options: dict, base_context: Context) -> int:
     """Return new start index based on input and context."""
-    if start is not None:
-        return start
-    return context._start if context else None
+    try:
+        return options['start']
+    except KeyError:
+        return base_context._start if base_context else None
 
 
-def _merge_timezone(timezone: str, context: Context) -> str:
+def _merge_timezone(options: dict, base_context: Context) -> str:
     """Return new timezone based on input and context."""
-    if timezone is not None:
-        return timezone
-    return context.timezone if context else None
+    try:
+        return options['timezone']
+    except KeyError:
+        return base_context.timezone if base_context else None
 
 
-def make_context(
-    *,
-    context: Context=None,
-    distinct: list=None,
-    fields: Union[str, list]=None,
-    locale: str=None,
-    limit: int=None,
-    namespace: str=None,
-    ordering: Union[str, list]=None,
-    page: int=None,
-    page_size: int=None,
-    query: Query=None,
-    returning: ReturnType=None,
-    scope: dict=None,
-    start: int=None,
-    timezone: str=None,
-) -> Context:
+def make_context(**options) -> Context:
     """Merge context options together."""
+    base_context = options.get('context')
     return Context(
-        distinct=_merge_distinct(distinct, context),
-        fields=_merge_fields(fields, context),
-        locale=_merge_locale(locale, context),
-        limit=_merge_limit(limit, context),
-        namespace=_merge_namespace(namespace, context),
-        ordering=_merge_ordering(ordering, context),
-        page=_merge_page(page, context),
-        page_size=_merge_page_size(page, context),
-        query=_merge_query(query, context),
-        returning=_merge_returning(returning, context),
-        scope=_merge_scope(scope, context),
-        start=_merge_start(start, context),
-        timezone=_merge_timezone(timezone, context)
+        distinct=_merge_distinct(options, base_context),
+        fields=_merge_fields(options, base_context),
+        locale=_merge_locale(options, base_context),
+        limit=_merge_limit(options, base_context),
+        namespace=_merge_namespace(options, base_context),
+        order=_merge_order(options, base_context),
+        page=_merge_page(options, base_context),
+        page_size=_merge_page_size(options, base_context),
+        returning=_merge_returning(options, base_context),
+        scope=_merge_scope(options, base_context),
+        start=_merge_start(options, base_context),
+        timezone=_merge_timezone(options, base_context),
+        where=_merge_query(options, base_context),
     )

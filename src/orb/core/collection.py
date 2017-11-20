@@ -41,28 +41,6 @@ class Collection:
             return len(self._records)
         return 0
 
-    async def add(self, record: object) -> object:
-        """Add given record to the collection."""
-        if self._records and record:
-            self._records.append(record)
-
-        if self.collector and record:
-            return await self.collector.add_record(self, record)
-
-        return None
-
-    async def create(self, values: dict) -> object:
-        """Create a new record for this collection."""
-        if self.collector:
-            return await self.collector.create_record(values)
-
-        elif self._records is not None:
-            record = self.model(values=values)
-            self._records.append(record)
-            return record
-
-        return None
-
     async def delete(self) -> int:
         """Delete the records in this collection from the store."""
         store = self.store or self.model.__store__

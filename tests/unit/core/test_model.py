@@ -552,3 +552,17 @@ async def test_model_create_view_read_only():
 
     with pytest.raises(ReadOnly):
         await UserView.create({'username': 'jdoe'})
+
+
+def test_model_select_collection():
+    """Test selecting a collection from a model."""
+    from orb import Model, Field, Query as Q
+
+    class User(Model):
+        id = Field()
+
+    coll = User.select(where=Q('id') == 1)
+
+    assert coll.model is User
+    assert coll.context.where.name == 'id'
+    assert coll.context.where.value == 1
