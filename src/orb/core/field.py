@@ -1,6 +1,7 @@
 """Define Field class."""
 
-import re
+import inflection
+
 from enum import IntFlag, auto
 from typing import Any
 
@@ -26,6 +27,8 @@ class FieldFlags(IntFlag):
     Translatable = auto()
     Unique = auto()
     Virtual = auto()
+
+    Primary = AutoAssign | Unique | Required
 
 
 class Field:
@@ -84,8 +87,7 @@ class Field:
         """
         if self._label:
             return self._label
-        text = ' '.join(re.findall('[a-zA-Z0-9]+', self.name))
-        return text.title()
+        return inflection.titleize(self.name)
 
     def getter(self, func: callable) -> callable:
         """Set the gettermethod property via decorator."""

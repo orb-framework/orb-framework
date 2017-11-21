@@ -9,16 +9,16 @@ async def test_store_without_backend():
 
     store = Store()
     with pytest.raises(RuntimeError):
-        await store.save_record(None)
+        await store.save_record(None, None)
 
     with pytest.raises(RuntimeError):
-        await store.save_collection(None)
+        await store.save_collection(None, None)
 
     with pytest.raises(RuntimeError):
-        await store.delete_record(None)
+        await store.delete_record(None, None)
 
     with pytest.raises(RuntimeError):
-        await store.delete_collection(None)
+        await store.delete_collection(None, None)
 
 
 def test_store_stack():
@@ -139,3 +139,11 @@ def test_store_with_context_override():
     assert c.context.store is auth
 
     pop_store()
+
+
+def test_store_backend_is_abstract():
+    """Test to ensure that the backend class type is abstract."""
+    from orb.core.store_backend import StoreBackend
+
+    with pytest.raises(TypeError):
+        StoreBackend()

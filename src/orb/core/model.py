@@ -5,6 +5,7 @@ from typing import Any, Dict, Tuple
 
 from .collection import Collection
 from .context import make_context
+from .field import Field
 from .model_type import ModelType
 from ..exceptions import ReadOnly
 
@@ -19,7 +20,7 @@ class Model(metaclass=ModelType):
 
     def __init__(
         self,
-        key: Any=None,
+        *key: Any,
         values: dict=None,
         state: dict=None,
         **context,
@@ -69,12 +70,14 @@ class Model(metaclass=ModelType):
 
         return fields, collections
 
-    async def delete(self):
+    async def delete(self, **context):
         """Delete this record from it's store."""
         if type(self).__view__:
             raise ReadOnly(type(self).__name__)
         else:
-            return await self.context.store.delete_record(self)
+            context.setdefault('context', self.context)
+            delete_context = make_context(**context)
+            return await self.context.store.delete_record(self, delete_context)
 
     async def gather(self, *keys, state: dict=None) -> tuple:
         """Return a list of values for the given keys."""
@@ -107,6 +110,14 @@ class Model(metaclass=ModelType):
             collection = await collector.collect_by_record(self)
             self.__collections[key] = collection
             return collection
+
+    async def get_primary_values(self, key: str='name') -> dict:
+        """Return the primary values for this record."""
+        out = {}
+        for field in self.__schema__.fields.values():
+            if field.test_flag(Field.Flags.Primary):
+                out[getattr(field, key)] = await self.get(field.name)
+        return out
 
     async def get_value(self, key: str, default: Any=None) -> Any:
         """Return the record's value for a given field."""
@@ -142,12 +153,14 @@ class Model(metaclass=ModelType):
         """Reset the local changes on this model."""
         self.__changes.clear()
 
-    async def save(self):
+    async def save(self, **context):
         """Save this model to the store."""
         if type(self).__view__:
             raise ReadOnly(type(self).__name__)
         elif self.__changes:
-            values = await self.context.store.save_record(self)
+            context.setdefault('context', self.context)
+            save_context = make_context(**context)
+            values = await self.context.store.save_record(self, save_context)
             self.__changes.update(values)
             self.mark_loaded()
             return True

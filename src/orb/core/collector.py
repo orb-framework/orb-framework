@@ -64,7 +64,7 @@ class Collector:
         constructor = constructor or (lambda x: model(values=x))
         if model is not None and records:
             records = [
-                record if type(record) is model else constructor(record)
+                constructor(record) if type(record) is dict else record
                 for record in records
             ]
             return Collection(

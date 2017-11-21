@@ -440,7 +440,7 @@ async def test_model_save():
     from orb import Model, Field, Store
 
     class Test:
-        async def save_record(self, record: Model) -> str:
+        async def save_record(self, record, context):
             return {'id': 1}
 
     store = Store(backend=Test())
@@ -461,7 +461,7 @@ async def test_model_save_without_modification():
     from orb import Model, Field, Store
 
     class Test:
-        async def save_record(self, record: Model) -> str:
+        async def save_record(self, record, context):
             return {'id': 1}
 
     store = Store(backend=Test())
@@ -497,7 +497,7 @@ async def test_model_delete():
     from orb import Model, Store
 
     class Test:
-        async def delete_record(self, record: Model) -> str:
+        async def delete_record(self, record, context):
             return 'deleted'
 
     store = Store(backend=Test())
@@ -529,7 +529,7 @@ async def test_model_create():
     from orb import Model, Field, Store
 
     class Test:
-        async def save_record(self, record: Model) -> str:
+        async def save_record(self, record, context):
             return {'id': 1}
 
     store = Store(backend=Test())

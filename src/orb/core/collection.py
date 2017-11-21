@@ -39,9 +39,11 @@ class Collection:
             return len(self._records)
         return 0
 
-    async def delete(self) -> int:
+    async def delete(self, **context) -> int:
         """Delete the records in this collection from the store."""
-        return await self.context.store.delete_collection(self)
+        context.setdefault('context', self.context)
+        delete_context = make_context(**context)
+        return await self.context.store.delete_collection(self, delete_context)
 
     async def get_count(self) -> int:
         """Return the size of the collection."""
@@ -112,9 +114,11 @@ class Collection:
             return Model.find_model(self._model)
         return self._model
 
-    async def save(self) -> int:
+    async def save(self, **context) -> int:
         """Delete the records in this collection from the store."""
-        return await self.context.store.save_collection(self)
+        context.setdefault('context', self.context)
+        save_context = make_context(**context)
+        return await self.context.store.save_collection(self, save_context)
 
     async def set(self, key: str, value: Any):
         """Set the value for a given key on each record in the collection."""

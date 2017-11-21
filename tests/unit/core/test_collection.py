@@ -122,7 +122,7 @@ async def test_collection_delete():
     from orb import Collection, Store
 
     class Test:
-        async def delete_collection(self, collection):
+        async def delete_collection(self, collection, context):
             return len(collection)
 
     store = Store(backend=Test())
@@ -137,7 +137,7 @@ async def test_collection_save():
     from orb import Collection, Store
 
     class Test:
-        async def save_collection(self, collection):
+        async def save_collection(self, collection, context):
             return []
 
     store = Store(backend=Test())

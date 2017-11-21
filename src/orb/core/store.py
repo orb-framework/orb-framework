@@ -6,7 +6,7 @@ STORE_STACK = []
 class Store:
     """Define backend storage for models."""
 
-    def __init__(self, name: str='', backend=None):
+    def __init__(self, name: str='', backend: 'StoreBackend'=None):
         self.backend = backend
         self.name = name
 
@@ -18,29 +18,37 @@ class Store:
         """Pop this store off the top of the stack."""
         pop_store(self)
 
-    def delete_record(self, record: 'Model') -> int:
+    async def delete_record(self, record: 'Model', context: 'Context') -> int:
         """Delete the record from the store."""
         if self.backend is None:
             raise RuntimeError('Store requires backend.')
-        return self.backend.delete_record(record)
+        return await self.backend.delete_record(record, context)
 
-    def delete_collection(self, collection: 'Collection') -> int:
+    async def delete_collection(
+        self,
+        collection: 'Collection',
+        context: 'Context'
+    ) -> int:
         """Delete the collection from the backend."""
         if self.backend is None:
             raise RuntimeError('Store requires backend.')
-        return self.backend.delete_collection(collection)
+        return await self.backend.delete_collection(collection, context)
 
-    def save_record(self, record: 'Model') -> dict:
+    async def save_record(self, record: 'Model', context: 'Context') -> dict:
         """Save the record to the store backend."""
         if self.backend is None:
             raise RuntimeError('Store requires backend.')
-        return self.backend.save_record(record)
+        return await self.backend.save_record(record, context)
 
-    def save_collection(self, collection: 'Collection') -> list:
+    async def save_collection(
+        self,
+        collection: 'Collection',
+        context: 'Context'
+    ) -> list:
         """Save the collection to the store backend."""
         if self.backend is None:
             raise RuntimeError('Store requires backend.')
-        return self.backend.save_collection(collection)
+        return await self.backend.save_collection(collection, context)
 
 
 def current_store(name: str=None) -> Store:
