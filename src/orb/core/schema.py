@@ -1,6 +1,8 @@
 """Define Schema class."""
 import inflection
 
+from typing import Dict, List
+
 
 class Schema:
     """Metadata about a Model class."""
@@ -12,13 +14,17 @@ class Schema:
         label: str=None,
         name: str=None,
         resource_name: str=None,
+        i18n_name: str=None
     ):
         self.inherits = inherits
-        self._label = label
         self.local_collectors = {}
         self.local_fields = {}
         self.local_indexes = {}
         self.name = name
+
+        self._i18n_name = i18n_name
+        self._key_fields = None
+        self._label = label
         self._resource_name = resource_name
 
     @property
@@ -30,6 +36,14 @@ class Schema:
                 output.update(schema.local_collectors)
         output.update(self.local_collectors)
         return output
+
+    @property
+    def default_order(self) -> Dict[str, 'Ordering']:
+        """Return default order for this schema."""
+        return [
+            (field.name, field.default_ordering)
+            for field in self.key_fields
+        ]
 
     @property
     def default_values(self) -> dict:
@@ -47,6 +61,28 @@ class Schema:
             if field.test_flag(field.Flags.Translatable):
                 return True
         return False
+
+    @property
+    def key_fields(self) -> List['Field']:
+        """Return a list of the key fields for this schema."""
+        if self._key_fields is None:
+            fields = self.fields
+            key_fields = []
+            for f in fields.values():
+                if f.test_flag(f.Flags.Key):
+                    key_fields.append(f)
+                    break
+
+            if not key_fields:
+                for i in self.indexes.values():
+                    if i.test_flag(i.Flags.Key):
+                        key_fields = [
+                            fields[field_name]
+                            for field_name in i.field_names
+                        ]
+
+            self._key_fields = key_fields
+        return self._key_fields
 
     @property
     def fields(self) -> dict:
@@ -74,14 +110,22 @@ class Schema:
         return self._label or inflection.titelize(self.name)
 
     @property
-    def primary_fields(self) -> list:
-        """Return a list of the primary fields for this schema."""
-        return [f for f in self.fields if f.test_flag(f.Flags.Primary)]
-
-    @property
     def resource_name(self) -> str:
         """Return the resource name for this schema."""
         if self._resource_name:
             return self._resource_name
         underscore = inflection.underscore(self.name)
         return inflection.pluralize(underscore)
+
+    @property
+    def i18n_name(self) -> str:
+        """Return the name used for internationalization for this model."""
+        return self._i18n_name or '{}_i18n'.format(self.resource_name)
+
+    @property
+    def translatable_fields(self) -> List['Field']:
+        """Return translatable fields for this schema."""
+        return [
+            f for f in self.fields.values()
+            if f.test_flag(f.Flags.Translatable)
+        ]

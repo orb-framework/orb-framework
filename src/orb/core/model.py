@@ -4,8 +4,7 @@ import asyncio
 from typing import Any, Dict, Tuple
 
 from .collection import Collection
-from .context import make_context
-from .field import Field
+from .context import ReturnType, make_context
 from .model_type import ModelType
 from ..exceptions import ReadOnly
 
@@ -20,10 +19,9 @@ class Model(metaclass=ModelType):
 
     def __init__(
         self,
-        *key: Any,
         values: dict=None,
         state: dict=None,
-        **context,
+        **context
     ):
         context.setdefault('store', type(self).__store__)
         self.context = make_context(**context)
@@ -111,12 +109,18 @@ class Model(metaclass=ModelType):
             self.__collections[key] = collection
             return collection
 
-    async def get_primary_values(self, key: str='name') -> dict:
-        """Return the primary values for this record."""
+    async def get_key(self):
+        """Return the unique key for this model."""
+        out = await self.gather(*(f.name for f in self.__schema__.key_fields))
+        if len(out) == 1:
+            return out[0]
+        return out
+
+    async def get_key_dict(self, key_property: str='name') -> dict:
+        """Return the key values for this record."""
         out = {}
-        for field in self.__schema__.fields.values():
-            if field.test_flag(Field.Flags.Primary):
-                out[getattr(field, key)] = await self.get(field.name)
+        for field in self.__schema__.key_fields:
+            out[getattr(field, key_property)] = await self.get(field.name)
         return out
 
     async def get_value(self, key: str, default: Any=None) -> Any:
@@ -143,6 +147,14 @@ class Model(metaclass=ModelType):
             key: (self.__state.get(key), self.__changes[key])
             for key in self.__changes
         }
+
+    @property
+    def is_new_record(self) -> bool:
+        """Return whether or not this record is new or not."""
+        for field in self.__schema__.key_fields:
+            if self.__state.get(field.name) is not None:
+                return False
+        return True
 
     def mark_loaded(self):
         """Stash changes to the local state."""
@@ -205,7 +217,39 @@ class Model(metaclass=ModelType):
     @classmethod
     async def fetch(cls, key: Any, **context):
         """Fetch a single record from the store for the given key."""
-        pass
+        from .query import Query as Q
+
+        # fetch directly from a key
+        q = Q()
+        key_fields = cls.__schema__.key_fields
+        if type(key) in (list, tuple):
+            if len(key) != len(key_fields):
+                raise RuntimeError('Invalid key provided.')
+            for i, field in key_fields:
+                q &= Q(field.name) == key[i]
+
+        # fetch from other keyable fields
+        else:
+            if len(key_fields) == 1:
+                q |= Q(key_fields[0].name) == key
+
+            for field in cls.__schema__.fields.values():
+                if field.test_flag(field.Flags.Keyable):
+                    q |= Q(field.name) == key
+
+        context['where'] = q & context.get('where')
+        context['limit'] = 1
+        context.setdefault('store', cls.__store__)
+        fetch_context = make_context(**context)
+        records = await fetch_context.store.get_records(cls, fetch_context)
+        try:
+            record_data = dict(records[0])
+        except IndexError:
+            return None
+        else:
+            if fetch_context.returning == ReturnType.Records:
+                return cls(state=record_data)
+            return record_data
 
     @classmethod
     def select(cls, **context) -> Collection:

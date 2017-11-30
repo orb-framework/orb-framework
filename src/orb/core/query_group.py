@@ -47,9 +47,9 @@ def make_query_group(
     is_left_group = isinstance(left, QueryGroup)
     is_right_group = isinstance(right, QueryGroup)
 
-    if getattr(right, 'is_null', False):
+    if getattr(right, 'is_null', True):
         return left
-    elif getattr(left, 'is_null', False):
+    elif getattr(left, 'is_null', True):
         return right
     elif is_left_group and is_right_group and left.op == right.op == op:
         return QueryGroup(

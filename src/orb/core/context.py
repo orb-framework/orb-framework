@@ -4,6 +4,8 @@ from typing import Union
 
 from .store import current_store
 
+DEFAULT_LOCALE = 'en_US'
+
 
 class Ordering(Enum):
     """Define ordering options."""
@@ -17,6 +19,7 @@ class ReturnType(Enum):
 
     Data = 'data'
     Records = 'records'
+    Count = 'count'
 
 
 class Context:
@@ -27,7 +30,7 @@ class Context:
         *,
         distinct: list=None,
         fields: list=None,
-        locale: str=None,
+        locale: str=DEFAULT_LOCALE,
         limit: int=None,
         namespace: str=None,
         order: list=None,
@@ -38,7 +41,7 @@ class Context:
         start: int=None,
         store: Union['Store', str]=None,
         timezone: str=None,
-        where: 'Query'=None,
+        where: 'Query'=None
     ):
         self.distinct = distinct
         self.fields = fields
@@ -67,7 +70,7 @@ class Context:
 
     def get_store(self) -> 'Store':
         """Return the store associated with this context."""
-        if not self._store or type(self._store) is str:
+        if self._store is None or type(self._store) is str:
             return current_store(self._store)
         return self._store
 
@@ -129,7 +132,7 @@ def _merge_locale(options: dict, base_context: Context) -> str:
     try:
         return options['locale']
     except KeyError:
-        return base_context.locale if base_context else None
+        return base_context.locale if base_context else DEFAULT_LOCALE
 
 
 def _merge_namespace(options: dict, base_context: Context) -> str:
@@ -221,7 +224,7 @@ def _merge_store(options: dict, base_context: Context) -> 'Store':
     try:
         return options['store']
     except KeyError:
-        return base_context.store if base_context else None
+        return base_context._store if base_context else None
 
 
 def _merge_timezone(options: dict, base_context: Context) -> str:
@@ -253,3 +256,25 @@ def make_context(**options) -> Context:
         timezone=_merge_timezone(options, base_context),
         where=_merge_query(options, base_context),
     )
+
+
+def make_record_context(**options) -> Context:
+    """Generate a context for a record."""
+    base_context = options.pop('context', None)
+    return Context(
+        distinct=_merge_distinct(options, base_context),
+        fields=_merge_fields(options, base_context),
+        locale=_merge_locale(options, base_context),
+        namespace=_merge_namespace(options, base_context),
+        returning=_merge_returning(options, base_context),
+        scope=_merge_scope(options, base_context),
+        store=_merge_store(options, base_context)
+    )
+
+
+def reverse_order(order: list) -> list:
+    """Reverse ordering by switching ascending and descending."""
+    return [
+        (x[0], Ordering.Asc if x[1] is Ordering.Desc else Ordering.Desc)
+        for x in order
+    ]

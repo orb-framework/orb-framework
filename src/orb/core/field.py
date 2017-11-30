@@ -2,9 +2,11 @@
 
 import inflection
 
-from enum import IntFlag, auto
-from typing import Any
+from aenum import IntFlag, auto
 
+from typing import Any, Union
+
+from .context import Ordering
 from ..utils import enum_from_set
 
 
@@ -15,6 +17,7 @@ class FieldFlags(IntFlag):
     AutoInclude = auto()
     CaseSensitive = auto()
     Encrypted = auto()
+    Key = auto()
     Keyable = auto()
     Polymorph = auto()
     Protected = auto()
@@ -28,8 +31,6 @@ class FieldFlags(IntFlag):
     Unique = auto()
     Virtual = auto()
 
-    Primary = AutoAssign | Unique | Required
-
 
 class Field:
     """Data class type for models."""
@@ -41,26 +42,29 @@ class Field:
         *,
         code: str=None,
         default: Any=None,
-        flags: Flags=FieldFlags(0),
+        default_ordering: Ordering=Ordering.Asc,
+        flags: Union[FieldFlags, set]=FieldFlags(0),
         gettermethod: callable=None,
         label: str='',
         name: str='',
         querymethod: callable=None,
         settermethod: callable=None,
-        shortcut: str='',
+        shortcut: str=''
     ):
-        self._code = code
-        self._default = default
+        self.default_ordering = default_ordering
         self.flags = (
             enum_from_set(FieldFlags, flags)
             if type(flags) is set else flags
         )
         self.gettermethod = gettermethod
-        self._label = label
         self.name = name
         self.querymethod = querymethod
         self.settermethod = settermethod
         self.shortcut = shortcut
+
+        self._code = code
+        self._default = default
+        self._label = label
 
     def get_code(self) -> str:
         """Return code for this field.

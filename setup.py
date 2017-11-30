@@ -1,5 +1,5 @@
 """Setup file for orb-framework."""
-
+import glob
 import os
 import re
 import subprocess
@@ -135,9 +135,10 @@ def parse_requirements(path: str) -> Tuple[List[str], List[str]]:
         return deps, urls
 
 
-def get_dependencies() -> Tuple[List[str], List[str], List[str]]:
+def get_dependencies() -> Tuple[list, list, dict, list]:
     """Parse the requirements files into dependencies."""
     install_requires = []
+    extras_require = {}
     tests_require = []
     links = []
 
@@ -151,7 +152,13 @@ def get_dependencies() -> Tuple[List[str], List[str], List[str]]:
         install_requires.extend(reqs)
         links.extend(urls)
 
-    return install_requires, tests_require, links
+    for fname in glob.glob('requirements-*.txt'):
+        extra_name = fname.split('-', 1)[1].split('.')[0]
+        reqs, urls = parse_requirements(fname)
+        extras_require[extra_name] = reqs
+        links.extend(urls)
+
+    return install_requires, tests_require, extras_require, links
 
 
 def get_version() -> str:
@@ -168,7 +175,7 @@ def get_version() -> str:
 
 
 if __name__ == '__main__':
-    install_requires, tests_require, links = get_dependencies()
+    install_requires, tests_require, extras_require, links = get_dependencies()
     version = get_version()
     packages = find_packages('src')
 
@@ -182,6 +189,7 @@ if __name__ == '__main__':
             'mkdocs': mkdocs,
             'test': tox
         },
+        extras_require=extras_require,
         install_requires=install_requires,
         license='MIT',
         maintainer='eric.hulser@gmail.com',

@@ -4,7 +4,6 @@ import pytest
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('records,expected_count', (
-    (None, 0),
     ([], 0),
     ([1, 2], 2),
 ))
@@ -17,6 +16,17 @@ async def test_collection_counter(records, expected_count):
     length = len(coll)
 
     assert count == length == expected_count
+
+
+@pytest.mark.asyncio
+async def test_collection_counter_wihout_store():
+    """Test for raising error with empty collection."""
+    from orb import Collection
+    from orb.exceptions import StoreNotFound
+
+    coll = Collection(records=None)
+    with pytest.raises(StoreNotFound):
+        await coll.get_count()
 
 
 @pytest.mark.asyncio
@@ -46,7 +56,6 @@ async def test_collection_nested_getter():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('records', (
-    None,
     [],
 ))
 async def test_collection_with_empty_records(records):

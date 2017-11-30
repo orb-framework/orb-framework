@@ -117,6 +117,35 @@ def test_model_definition_with_abstraction():
     assert e_schema.fields['badge'] is not a_schema.fields['badge']
 
 
+def test_model_definition_with_key():
+    """Test defining a model with a single key."""
+    from orb import Model, Field
+
+    class User(Model):
+        id = Field(flags={'Key'})
+
+    assert User.__schema__.key_fields == [User.__schema__.fields['id']]
+
+
+def test_model_definition_with_multiple_keys():
+    """Test defining a model with multiple keys."""
+    from orb import Model, Field, Index
+
+    class User(Model):
+        first_name = Field()
+        last_name = Field()
+
+        by_first_and_last_name = Index(
+            ('first_name', 'last_name'),
+            flags={'Key'}
+        )
+
+    assert User.__schema__.key_fields == [
+        User.__schema__.fields['first_name'],
+        User.__schema__.fields['last_name']
+    ]
+
+
 @pytest.mark.asyncio
 async def test_model_definition_with_getters():
     """Test a model with custom field getters."""
@@ -154,7 +183,7 @@ async def test_model_definition_with_virtual_decorator():
 
         @virtual(Collector)
         async def groups(self):
-            return Collection()
+            return Collection(records=[])
 
     u = User(values={'first_name': 'John', 'last_name': 'Doe'})
     assert await u.get('display_name') == 'John Doe'

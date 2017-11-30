@@ -1,6 +1,6 @@
 """Define Collector class."""
+from aenum import IntFlag, auto
 
-from enum import IntFlag, auto
 from typing import Iterable
 
 from .collection import Collection
@@ -27,7 +27,7 @@ class Collector:
         model: str=None,
         name: str=None,
         querymethod: callable=None,
-        settermethod: callable=None,
+        settermethod: callable=None
     ):
         self.code = code
         self.gettermethod = gettermethod

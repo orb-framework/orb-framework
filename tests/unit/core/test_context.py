@@ -4,11 +4,12 @@
 def test_context_creation():
     """Test creating an empty context."""
     from orb import make_context, ReturnType
+    from orb.core.context import DEFAULT_LOCALE
 
     context = make_context()
     assert context.distinct is None
     assert context.fields is None
-    assert context.locale is None
+    assert context.locale is DEFAULT_LOCALE
     assert context.limit is None
     assert context.namespace is None
     assert context.order is None

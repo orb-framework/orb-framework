@@ -179,3 +179,13 @@ def test_query_joining_with_blanks():
     assert type(b) is Q
     assert b.name == 'username'
     assert b.value == 'bob'
+
+
+def test_query_joining_with_none():
+    """Test joining queries with None."""
+    from orb import Query as Q
+
+    a = Q('username') == 'bob'
+    b = a & None
+
+    assert b is a

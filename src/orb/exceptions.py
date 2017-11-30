@@ -12,3 +12,10 @@ class ReadOnly(OrbException):
 
     def __init__(self, name: str):
         super().__init__('{} are read only'.format(name))
+
+
+class StoreNotFound(OrbException):
+    """Raised when accessing a store but none is available."""
+
+    def __init__(self):
+        super().__init__('Store not found.')

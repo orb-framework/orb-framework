@@ -24,18 +24,24 @@ async def test_store_without_backend():
 def test_store_stack():
     """Test store stack creation."""
     from orb import Store, current_store
+    from orb.exceptions import StoreNotFound
 
     store = Store()
 
-    assert current_store() is None
+    with pytest.raises(StoreNotFound):
+        current_store()
+
     with store:
         assert current_store() is store
-    assert current_store() is None
+
+    with pytest.raises(StoreNotFound):
+        current_store()
 
 
 def test_store_stack_for_context():
     """Test store stack with context usage."""
     from orb import Store, Model
+    from orb.exceptions import StoreNotFound
 
     store = Store()
 
@@ -43,15 +49,20 @@ def test_store_stack_for_context():
         pass
 
     u = User()
-    assert u.context.store is None
+    with pytest.raises(StoreNotFound):
+        u.context.store
+
     with store:
         assert u.context.store is store
-    assert u.context.store is None
+
+    with pytest.raises(StoreNotFound):
+        u.context.store
 
 
 def test_store_with_name():
     """Test store with naming context usage."""
     from orb import Store, Model
+    from orb.exceptions import StoreNotFound
 
     class User(Model):
         __store__ = 'auth'
@@ -65,24 +76,34 @@ def test_store_with_name():
     u = User()
     b = Book()
 
-    assert u.context.store is None
-    assert b.context.store is None
+    with pytest.raises(StoreNotFound):
+        u.context.store
+    with pytest.raises(StoreNotFound):
+        b.context.store
+
     with auth, content:
         assert u.context.store is auth
         assert b.context.store is content
     with content:
-        assert u.context.store is None
         assert b.context.store is content
+        with pytest.raises(StoreNotFound):
+            u.context.store
     with auth:
         assert u.context.store is auth
-        assert b.context.store is None
-    assert u.context.store is None
-    assert b.context.store is None
+        with pytest.raises(StoreNotFound):
+            b.context.store
+
+    with pytest.raises(StoreNotFound):
+        u.context.store
+
+    with pytest.raises(StoreNotFound):
+        b.context.store
 
 
 def test_store_with_global_reference():
     """Test store with global context registry."""
     from orb import Store, Model, push_store, pop_store
+    from orb.exceptions import StoreNotFound
 
     class User(Model):
         __store__ = 'auth'
@@ -107,8 +128,10 @@ def test_store_with_global_reference():
     assert pop_store() is None
     assert pop_store(auth) is None
 
-    assert u.context.store is None
-    assert b.context.store is None
+    with pytest.raises(StoreNotFound):
+        u.context.store
+    with pytest.raises(StoreNotFound):
+        b.context.store
 
 
 def test_store_with_context_override():

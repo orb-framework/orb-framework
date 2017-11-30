@@ -1,5 +1,6 @@
 """Define an abstract backend interface for a store."""
 from abc import ABCMeta, abstractmethod
+from typing import List, Type
 
 
 class StoreBackend(metaclass=ABCMeta):
@@ -17,6 +18,24 @@ class StoreBackend(metaclass=ABCMeta):
         context: 'Context'
     ) -> int:
         """Delete the collection from the backend."""
+        pass
+
+    @abstractmethod
+    async def get_records(
+        self,
+        model: Type['Model'],
+        context: 'Context'
+    ) -> List[dict]:
+        """Get records from the store based on the given context."""
+        pass
+
+    @abstractmethod
+    async def get_record_count(
+        self,
+        model: Type['Model'],
+        context: 'Context'
+    ) -> int:
+        """Return the number of records available for the given context."""
         pass
 
     @abstractmethod

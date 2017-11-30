@@ -1,5 +1,9 @@
 """Define Store class."""
 
+from typing import List, Type
+
+from ..exceptions import StoreNotFound
+
 STORE_STACK = []
 
 
@@ -34,6 +38,16 @@ class Store:
             raise RuntimeError('Store requires backend.')
         return await self.backend.delete_collection(collection, context)
 
+    async def get_records(
+        self,
+        model: Type['Model'],
+        context: 'Context'
+    ) -> List[dict]:
+        """Get records from the store based on the given context."""
+        if self.backend is None:
+            raise RuntimeError('Store requires backend.')
+        return await self.backend.get_records(model, context)
+
     async def save_record(self, record: 'Model', context: 'Context') -> dict:
         """Save the record to the store backend."""
         if self.backend is None:
@@ -57,11 +71,13 @@ def current_store(name: str=None) -> Store:
         try:
             return STORE_STACK[-1]
         except IndexError:
-            return None
+            raise StoreNotFound()
+
     for store in STORE_STACK:
         if store.name == name:
             return store
-    return None
+    else:
+        raise StoreNotFound()
 
 
 def push_store(store: Store) -> Store:
