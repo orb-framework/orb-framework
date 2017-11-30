@@ -10,9 +10,15 @@ STORE_STACK = []
 class Store:
     """Define backend storage for models."""
 
-    def __init__(self, name: str='', backend: 'StoreBackend'=None):
+    def __init__(
+        self,
+        name: str='',
+        namespace: str='',
+        backend: 'StoreBackend'=None
+    ):
         self.backend = backend
         self.name = name
+        self.namespace = namespace
 
     def __enter__(self):
         """Push this store onto the top of the stack."""
@@ -37,6 +43,12 @@ class Store:
         if self.backend is None:
             raise RuntimeError('Store requires backend.')
         return await self.backend.delete_collection(collection, context)
+
+    async def get_count(self, model: Type['Model'], context: 'Context') -> int:
+        """Return a count of the records given a model and search context."""
+        if self.backend is None:
+            raise RuntimeError('Store requires backend.')
+        return await self.backend.get_count(model, context)
 
     async def get_records(
         self,

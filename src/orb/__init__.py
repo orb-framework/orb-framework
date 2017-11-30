@@ -13,6 +13,7 @@ from .core.index import Index  # noqa: F401
 from .core.model import Model  # noqa: F401
 from .core.query import Query  # noqa: F401
 from .core.query_group import QueryGroup  # noqa: F401
+from .core.schema import Schema  # noqa: F401
 from .core.store import (  # noqa: F401
     Store,
     current_store,

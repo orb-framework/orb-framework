@@ -94,9 +94,11 @@ async def test_sql_delete_record_from_namespace(
     engine
 ):
     """Test the SQL engine deletes a record from a given namespace."""
-    from orb import Model, Field
+    from orb import Model, Field, Schema
 
     class User(Model):
+        __schema__ = Schema(namespace='auth')
+
         id = Field(flags=Field.Flags.Key)
 
     async def execute(sql, *values):
@@ -105,7 +107,7 @@ async def test_sql_delete_record_from_namespace(
     store, mock = mock_sql_backend(engine, side_effect=execute)
     with store:
         u = User(values={'id': 1})
-        result = await u.delete(namespace='auth')
+        result = await u.delete()
         mock.assert_called_with(
             engine.DELETE_RECORD_BY_KEY_FIELD.format(
                 namespace='auth',
@@ -340,6 +342,69 @@ async def test_sql_get_record_with_column_as(
             ),
             1
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('name,engine', SQL_ENGINES.items())
+async def test_sql_get_record_count(
+    mock_sql_backend,
+    name,
+    engine
+):
+    """Test SQL engine getting the first record of a collection."""
+    from orb import Model, Field
+
+    class User(Model):
+        id = Field(flags={'Key'})
+        username = Field()
+
+    async def fetch(sql, *values):
+        return [{'count': 100}]
+
+    store, mock = mock_sql_backend(engine, side_effect=fetch)
+    with store:
+        count = await User.select().get_count()
+        mock.assert_called_with(
+            engine.GET_RECORD_COUNT.format(
+                namespace=store.backend.default_namespace,
+                table='users',
+            ),
+        )
+        assert count == 100
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('name,engine', SQL_ENGINES.items())
+async def test_sql_get_filtered_record_count(
+    mock_sql_backend,
+    name,
+    engine
+):
+    """Test SQL engine getting the first record of a collection."""
+    from orb import Model, Field, Query
+
+    class User(Model):
+        id = Field(flags={'Key'})
+        username = Field()
+
+    async def fetch(sql, *values):
+        return [{'count': 1}]
+
+    store, mock = mock_sql_backend(engine, side_effect=fetch)
+    with store:
+        a = Query('username') == 'john.doe'
+        b = Query('username') == 'jane.doe'
+        count = await User.select(where=a | b).get_count()
+        mock.assert_called_with(
+            engine.GET_FILTERED_RECORD_COUNT.format(
+                column='username',
+                namespace=store.backend.default_namespace,
+                table='users',
+            ),
+            'john.doe',
+            'jane.doe'
+        )
+        assert count == 1
 
 
 @pytest.mark.asyncio

@@ -30,6 +30,7 @@ class Context:
         *,
         distinct: list=None,
         fields: list=None,
+        force_namespace: bool=False,
         locale: str=DEFAULT_LOCALE,
         limit: int=None,
         namespace: str=None,
@@ -44,6 +45,7 @@ class Context:
         where: 'Query'=None
     ):
         self.distinct = distinct
+        self.force_namespace = force_namespace
         self.fields = fields
         self.locale = locale
         self._limit = limit
@@ -270,6 +272,21 @@ def make_record_context(**options) -> Context:
         scope=_merge_scope(options, base_context),
         store=_merge_store(options, base_context)
     )
+
+
+def resolve_namespace(
+    schema: 'Schema',
+    context: 'Context',
+    default: str=''
+) -> str:
+    """Determine the best possible namespace for a set of params."""
+    if schema.namespace and not context.force_namespace:
+        return schema.namespace
+    elif context.namespace:
+        return context.namespace
+    elif context.store and context.store.namespace:
+        return context.store.namespace
+    return default
 
 
 def reverse_order(order: list) -> list:

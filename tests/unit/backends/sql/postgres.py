@@ -10,9 +10,9 @@ DELETE_RECORD_BY_KEY_INDEX = (
     'WHERE ("{column_a}"=$1 AND "{column_b}"=$2);'
 )
 DELETE_I18N_RECORD_BY_KEY_FIELD = (
-    'DELETE FROM "{namespace}"."{table}" '
-    'WHERE ("{column}"=$1);\n'
     'DELETE FROM "{namespace}"."{table}_i18n" '
+    'WHERE ("{column}"=$1);\n'
+    'DELETE FROM "{namespace}"."{table}" '
     'WHERE ("{column}"=$1);'
 )
 GET_FIRST_RECORD = (
@@ -38,6 +38,15 @@ GET_RECORD_BY_KEY_INDEX = (
     'FROM "{namespace}"."{table}"\n'
     'ORDER BY "{column_a}" ASC, "{column_b}" ASC\n'
     'LIMIT 1;'
+)
+GET_RECORD_COUNT = (
+    'SELECT COUNT(*) AS "count"\n'
+    'FROM "{namespace}"."{table}";'
+)
+GET_FILTERED_RECORD_COUNT = (
+    'SELECT COUNT(*) AS "count"\n'
+    'FROM "{namespace}"."{table}"\n'
+    'WHERE ("{column}"=$1 OR "{column}"=$2);'
 )
 GET_RECORD_WITH_COLUMN_AS = (
     'SELECT "{column_a}", "{column_b}" AS "{column_b_as}"\n'

@@ -11,16 +11,18 @@ class Schema:
         self,
         *,
         inherits: list=None,
-        label: str=None,
-        name: str=None,
-        resource_name: str=None,
-        i18n_name: str=None
+        label: str='',
+        name: str='',
+        namespace: str='',
+        resource_name: str='',
+        i18n_name: str=''
     ):
         self.inherits = inherits
         self.local_collectors = {}
         self.local_fields = {}
         self.local_indexes = {}
         self.name = name
+        self.namespace = namespace
 
         self._i18n_name = i18n_name
         self._key_fields = None

@@ -66,6 +66,8 @@ class ModelType(type):
                 attributes.get('__schema__') or
                 Schema(name=clsname, inherits=inherits)
             )
+            if not schema.name:
+                schema.name = clsname
 
             cls_attributes = {}
             for key, value in attributes.items():

@@ -170,3 +170,26 @@ def test_collection_refining():
     assert coll2.context.where.queries[0].name == 'username'
     assert coll2.context.where.queries[0].value == 'bob'
     assert coll2.context.where.queries[1] is coll.context.where
+
+
+@pytest.mark.asyncio
+async def test_collection_slicing():
+    """Test slicing a collection will update context."""
+    from orb import Collection
+
+    coll = Collection(records=[1, 2, 3])
+    assert await coll[1:2].get_records() == [2]
+    assert await coll[1:].get_records() == [2, 3]
+    assert await coll[:1].get_records() == [1]
+
+    coll2 = Collection()
+    full_slice = coll2[1:2]
+    left_slice = coll2[1:]
+    right_slice = coll2[:2]
+
+    assert full_slice.context.start == 1
+    assert full_slice.context.limit == 1
+    assert left_slice.context.start == 1
+    assert left_slice.context.limit is None
+    assert right_slice.context.start is None
+    assert right_slice.context.limit == 2

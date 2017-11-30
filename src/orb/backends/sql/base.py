@@ -3,7 +3,12 @@
 from abc import ABCMeta, abstractmethod
 from typing import Dict, List, Tuple, Type, Union
 
-from orb.core.context import Ordering, ReturnType, make_context
+from orb.core.context import (
+    Ordering,
+    ReturnType,
+    make_context,
+    resolve_namespace
+)
 from orb.core.query import Query
 from orb.core.query_group import QueryGroup
 
@@ -13,8 +18,20 @@ DEFAULT_ORDER_MAP = {
 }
 DEFAULT_QUOTE = '`'
 DEFAULT_OP_MAP = {
+    Query.Op.After: '>',
+    Query.Op.Before: '<',
+    Query.Op.Contains: 'LIKE',
+    Query.Op.ContainsInsensitive: 'ILIKE',
     Query.Op.Is: '=',
+    Query.Op.IsIn: 'IN',
     Query.Op.IsNot: '!=',
+    Query.Op.IsNotIn: 'NOT IN',
+    Query.Op.GreaterThan: '>',
+    Query.Op.GreaterThanOrEqual: '>=',
+    Query.Op.LessThan: '<',
+    Query.Op.LessThanOrEqual: '<=',
+    Query.Op.Matches: '~',
+
     QueryGroup.Op.And: 'AND',
     QueryGroup.Op.Or: 'OR'
 }
@@ -65,9 +82,9 @@ class SqlBackend(metaclass=ABCMeta):
 
         if schema.has_translations:
             sql = (
-                'DELETE FROM {q}{namespace}{q}.{q}{table}{q} '
-                'WHERE ({args});\n'
                 'DELETE FROM {q}{namespace}{q}.{q}{table_i18n}{q} '
+                'WHERE ({args});\n'
+                'DELETE FROM {q}{namespace}{q}.{q}{table}{q} '
                 'WHERE ({args});'
             )
         else:
@@ -78,7 +95,11 @@ class SqlBackend(metaclass=ABCMeta):
 
         statement = sql.format(
             args=args,
-            namespace=context.namespace or self.default_namespace,
+            namespace=resolve_namespace(
+                schema,
+                context,
+                default=self.default_namespace
+            ),
             q=self.quote,
             table=schema.resource_name,
             table_i18n=schema.i18n_name
@@ -95,12 +116,26 @@ class SqlBackend(metaclass=ABCMeta):
         """Fetch values from the database for the given sql."""
         pass
 
+    async def get_count(
+        self,
+        model: Type['Model'],
+        context: 'Context'
+    ) -> int:
+        """Return number of records available for the given context."""
+        count_context = make_context(
+            returning=ReturnType.Count,
+            context=context
+        )
+        results = await self.get_records(model, count_context)
+        return results[0]['count']
+
     async def get_records(
         self,
         model: Type['Model'],
         context: 'Context'
     ) -> List[dict]:
         """Get records from the store based on the given context."""
+        schema = model.__schema__
         sql = (
             'SELECT {columns}\n'
             'FROM {q}{namespace}{q}.{q}{table}{q}\n'
@@ -112,7 +147,7 @@ class SqlBackend(metaclass=ABCMeta):
 
         if context.returning == ReturnType.Count:
             fields = []
-            columns = ['COUNT(*) AS count']
+            columns = ['COUNT(*) AS {0}count{0}'.format(self.quote)]
         else:
             fields, columns = fields_to_sql(
                 model,
@@ -139,31 +174,19 @@ class SqlBackend(metaclass=ABCMeta):
         statement = sql.format(
             columns=', '.join(columns),
             limit='LIMIT {}\n'.format(context.limit) if context.limit else '',
-            namespace=context.namespace or self.default_namespace,
+            namespace=resolve_namespace(
+                schema,
+                context,
+                default=self.default_namespace
+            ),
             order='ORDER BY {}\n'.format(order) if order else '',
             q=self.quote,
             start='START {}\n'.format(context.start) if context.start else '',
             where='WHERE ({})\n'.format(where) if where else '',
-            table=model.__schema__.resource_name
+            table=schema.resource_name
         ).strip() + ';'
 
-        result = await self.fetch(statement, *values)
-        if context.returning == ReturnType.Count:
-            return result[0]['count']
-        return result
-
-    async def get_record_count(
-        self,
-        model: Type['Model'],
-        context: 'Context'
-    ) -> int:
-        """Return number of records available for the given context."""
-        count_context = make_context(
-            returning=ReturnType.Count,
-            context=context
-        )
-        results = await self.get_records(model, count_context)
-        return results[0]['count']
+        return await self.fetch(statement, *values)
 
     async def insert_record(self, record: 'Model', context: 'Context') -> dict:
         """Insert new record into the database."""
@@ -209,7 +232,11 @@ class SqlBackend(metaclass=ABCMeta):
             )
 
         statement = sql.format(
-            namespace=context.namespace or self.default_namespace,
+            namespace=resolve_namespace(
+                schema,
+                context,
+                default=self.default_namespace
+            ),
             i18n_columns=', '.join(i18n_columns),
             i18n_values=', '.join(i18n_values),
             q=self.quote,
@@ -298,7 +325,7 @@ def query_to_sql(
         return ''
     elif isinstance(query, QueryGroup):
         joiner = op_map[query.op]
-        return joiner.join(
+        return ' {} '.format(joiner).join(
             query_to_sql(
                 model,
                 sub_query,
@@ -310,13 +337,17 @@ def query_to_sql(
             for sub_query in query.queries
         )
     else:
+        op = op_map[query.op]
         field = model.__schema__.fields[query.name]
         values.append(query.value)
+        if callable(op):
+            return op(field.code, len(values), quote)
+
         pattern = '{q}{code}{q}{op}${index}'
         return pattern.format(
             q=quote,
             code=field.code,
-            op=op_map[query.op],
+            op=op,
             index=len(values)
         )
 

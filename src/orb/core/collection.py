@@ -43,11 +43,38 @@ class Collection:
         self._last = UNDEFINED
         self._count = UNDEFINED
 
+    def __getitem__(self, index):
+        """Return records based on Python get item syntax."""
+        if type(index) == slice:
+            if self._records:
+                return self.clone(records=self._records[index])
+            elif index.start is not None and index.stop is not None:
+                return self.refine(
+                    limit=(index.stop - index.start),
+                    start=index.start
+                )
+            elif index.start is not None:
+                return self.refine(start=index.start)
+            else:
+                return self.refine(limit=index.stop)
+        elif self._records:
+            return self._records[index]
+
     def __len__(self):
         """Return length of this collection."""
         if self._records is not None:
             return len(self._records)
         return 0
+
+    def clone(self, **options):
+        """Create copy of this collection with any overrides."""
+        options.setdefault('context', self.context)
+        options.setdefault('collector', self.collector)
+        options.setdefault('source', self.source)
+        options.setdefault('target', self.target)
+        options.setdefault('model', self._model)
+        options.setdefault('records', self._records)
+        return Collection(**options)
 
     async def delete(self, **context) -> int:
         """Delete the records in this collection from the store."""
@@ -63,7 +90,7 @@ class Collection:
             return len(self._records)
         else:
             count_context = make_context(context=self.context)
-            self._count = await self.context.store.get_record_count(
+            self._count = await self.context.store.get_count(
                 self.model,
                 count_context
             )
@@ -177,13 +204,7 @@ class Collection:
         """Refine this collection down with a new context."""
         context.setdefault('context', self.context)
         new_context = make_context(**context)
-        return Collection(
-            context=new_context,
-            collector=self.collector,
-            model=self._model,
-            source=self.source,
-            target=self.target
-        )
+        return self.clone(context=new_context)
 
     @property
     def model(self):
