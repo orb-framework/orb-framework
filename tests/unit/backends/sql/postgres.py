@@ -49,7 +49,7 @@ GET_FILTERED_RECORD_COUNT = (
     'WHERE ("{column}"=$1 OR "{column}"=$2);'
 )
 GET_RECORD_WITH_COLUMN_AS = (
-    'SELECT "{column_a}", "{column_b}" AS "{column_b_as}"\n'
+    'SELECT "{column_a}", "{column_b}" AS "{label_b}"\n'
     'FROM "{namespace}"."{table}"\n'
     'WHERE ("{column_a}"=$1)\n'
     'LIMIT 1;'

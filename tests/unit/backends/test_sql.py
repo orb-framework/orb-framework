@@ -338,7 +338,7 @@ async def test_sql_get_record_with_column_as(
                 table='users',
                 column_a='id',
                 column_b='name',
-                column_b_as='username'
+                label_b='username'
             ),
             1
         )
