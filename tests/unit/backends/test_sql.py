@@ -426,7 +426,7 @@ async def test_sql_get_first_record(mock_sql_backend, name, engine):
         all_users = User.select()
         u = await all_users.get_first()
         mock_fetch.assert_called_with(
-            engine.GET_FIRST_RECORD.format(
+            engine.GET_FIRST_RECORD_BY_KEY_FIELD.format(
                 namespace=store.backend.default_namespace,
                 table='users',
                 column_a='id',
@@ -459,7 +459,7 @@ async def test_sql_get_last_record(mock_sql_backend, name, engine):
         all_users = User.select()
         u = await all_users.get_last()
         mock.assert_called_with(
-            engine.GET_LAST_RECORD.format(
+            engine.GET_LAST_RECORD_BY_KEY_FIELD.format(
                 namespace=store.backend.default_namespace,
                 table='users',
                 column_a='id',

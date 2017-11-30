@@ -15,13 +15,13 @@ DELETE_I18N_RECORD_BY_KEY_FIELD = (
     'DELETE FROM "{namespace}"."{table}" '
     'WHERE ("{column}"=$1);'
 )
-GET_FIRST_RECORD = (
+GET_FIRST_RECORD_BY_KEY_FIELD = (
     'SELECT "{column_a}", "{column_b}"\n'
     'FROM "{namespace}"."{table}"\n'
     'ORDER BY "{column_a}" ASC\n'
     'LIMIT 1;'
 )
-GET_LAST_RECORD = (
+GET_LAST_RECORD_BY_KEY_FIELD = (
     'SELECT "{column_a}", "{column_b}"\n'
     'FROM "{namespace}"."{table}"\n'
     'ORDER BY "{column_a}" DESC\n'
