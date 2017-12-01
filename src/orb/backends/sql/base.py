@@ -1,7 +1,7 @@
 """Define abstract SQL backend class."""
 
 from abc import ABCMeta, abstractmethod
-from typing import Dict, List, Tuple, Type, Union
+from typing import Any, Dict, List, Tuple, Type, Union
 
 from orb.core.context import (
     Ordering,
@@ -71,6 +71,104 @@ class SqlBackend(metaclass=ABCMeta):
         """Delete collection of records from the database."""
         pass
 
+    async def create_record(self, record: 'Model', context: 'Context') -> dict:
+        """Insert new record into the database."""
+        standard_changes, i18n_changes = group_changes(record)
+        if i18n_changes:
+            return await self.create_i18n_record(
+                record,
+                context,
+                standard_changes,
+                i18n_changes
+            )
+        else:
+            return await self.create_standard_record(
+                record,
+                context,
+                standard_changes
+            )
+
+    async def create_i18n_record(
+        self,
+        record: 'Model',
+        context: 'Context',
+        standard_changes: dict,
+        i18n_changes: dict
+    ) -> dict:
+        """Create a translatable record in the database."""
+        schema = record.__schema__
+        sql = (
+            'INSERT INTO {q}{namespace}{q}.{q}{table}{q} (\n'
+            '   {columns}\n'
+            ')\n'
+            'VALUES({values});\n'
+            'INSERT INTO {q}{namespace}{q}.{q}{i18n_table}{q} (\n'
+            '   {i18n_columns}\n'
+            ')\n'
+            'VALUES({i18n_values});'
+        )
+
+        column_str, value_str, values = changes_to_sql(
+            standard_changes,
+            quote=self.quote
+        )
+
+        i18n_changes.setdefault('locale', context.locale)
+        i18n_column_str, i18n_value_str, i18n_values = changes_to_sql(
+            i18n_changes,
+            quote=self.quote,
+            offset=len(values)
+        )
+
+        statement = sql.format(
+            columns=column_str,
+            i18n_columns=i18n_column_str,
+            i18n_values=i18n_value_str,
+            i18n_table=schema.i18n_name,
+            namespace=resolve_namespace(
+                schema,
+                context,
+                default=self.default_namespace
+            ),
+            q=self.quote,
+            values=value_str,
+            table=schema.resource_name,
+        )
+        return await self.execute(statement, *values, *i18n_values)
+
+    async def create_standard_record(
+        self,
+        record: 'Model',
+        context: 'Context',
+        changes: dict
+    ) -> dict:
+        """Create a standard record in the database."""
+        schema = record.__schema__
+        sql = (
+            'INSERT INTO {q}{namespace}{q}.{q}{table}{q} (\n'
+            '   {columns}\n'
+            ')\n'
+            'VALUES({values});'
+        )
+
+        column_str, value_str, values = changes_to_sql(
+            changes,
+            quote=self.quote
+        )
+
+        statement = sql.format(
+            columns=column_str,
+            namespace=resolve_namespace(
+                schema,
+                context,
+                default=self.default_namespace
+            ),
+            q=self.quote,
+            values=value_str,
+            table=schema.resource_name,
+        )
+        return await self.execute(statement, *values)
+
     async def delete_record(self, record: 'Model', context: 'Context') -> int:
         """Delete record from database."""
         schema = record.__schema__
@@ -82,7 +180,7 @@ class SqlBackend(metaclass=ABCMeta):
 
         if schema.has_translations:
             sql = (
-                'DELETE FROM {q}{namespace}{q}.{q}{table_i18n}{q} '
+                'DELETE FROM {q}{namespace}{q}.{q}{i18n_table}{q} '
                 'WHERE ({args});\n'
                 'DELETE FROM {q}{namespace}{q}.{q}{table}{q} '
                 'WHERE ({args});'
@@ -102,7 +200,7 @@ class SqlBackend(metaclass=ABCMeta):
             ),
             q=self.quote,
             table=schema.resource_name,
-            table_i18n=schema.i18n_name
+            i18n_table=schema.i18n_name
         )
         return await self.execute(statement, *values)
 
@@ -188,65 +286,6 @@ class SqlBackend(metaclass=ABCMeta):
 
         return await self.fetch(statement, *values)
 
-    async def insert_record(self, record: 'Model', context: 'Context') -> dict:
-        """Insert new record into the database."""
-        schema = record.__schema__
-
-        standard_columns = []
-        standard_values = []
-        i18n_columns = []
-        i18n_values = []
-
-        values = []
-
-        for field_name, (_, new_value) in record.local_changes.items():
-            field = schema.fields[field_name]
-
-            if not field.test_flag(field.Flags.Translatable):
-                values.append(new_value)
-                standard_columns.append('{0}{1}{0}'.format(
-                    self.quote,
-                    field.code
-                ))
-                standard_values.append('${}'.format(len(values)))
-            else:
-                if not i18n_columns:
-                    values.append(context.locale)
-                    i18n_columns.append('{0}locale{0}'.format(self.quote))
-                    i18n_values.append('${}'.format(len(values)))
-                values.append(new_value)
-                i18n_columns.append('{0}{1}{0}'.format(self.quote, field.code))
-                i18n_values.append('${}'.format(len(values)))
-
-        sql = (
-            'INSERT INTO {q}{namespace}{q}.{q}{table}{q}\n'
-            'SET ({standard_columns})\n'
-            'VALUES {standard_values};'
-        )
-        if i18n_columns:
-            sql += (
-                '\n'
-                'INSERT INTO {q}{namespace}{q}.{q}{table_i18n}{q}\n'
-                'SET ({i18n_columns})\n'
-                'VALUES {i18n_values};'
-            )
-
-        statement = sql.format(
-            namespace=resolve_namespace(
-                schema,
-                context,
-                default=self.default_namespace
-            ),
-            i18n_columns=', '.join(i18n_columns),
-            i18n_values=', '.join(i18n_values),
-            q=self.quote,
-            standard_columns=', '.join(standard_columns),
-            standard_values=', '.join(standard_values),
-            table=schema.resource_name,
-            table_i18n=schema.i18n_name
-        )
-        return await self.execute(statement, *values)
-
     async def save_collection(
         self,
         collection: 'Collection',
@@ -258,7 +297,7 @@ class SqlBackend(metaclass=ABCMeta):
     async def save_record(self, record: 'Model', context: 'Context') -> dict:
         """Save record to backend database."""
         if record.is_new_record:
-            return await self.insert_record(record, context)
+            return await self.create_record(record, context)
         else:
             return await self.update_record(record, context)
 
@@ -270,18 +309,59 @@ def args_to_sql(
     quote: str=DEFAULT_QUOTE,
 ) -> Tuple[str, list]:
     """Generate argument tuple from a dictionary."""
-    pattern = '{q}{key}{q}=${index}'
+    pattern = '{q}{key}{q}={value}'
     return (
         joiner.join(
-            pattern.format(q=quote, key=key, index=i + 1)
-            for i, key in enumerate(kwargs.keys())
+            pattern.format(
+                q=quote,
+                key=key,
+                value=getattr(
+                    kwargs[key],
+                    'literal_value',
+                    '${}'.format(i + 1)
+                )
+            ) for i, key in enumerate(kwargs.keys())
         ),
         kwargs.values()
     )
 
 
+def changes_to_sql(
+    changes: Dict[Union['Field', str], Any],
+    quote: str=DEFAULT_QUOTE,
+    offset: int=0
+) -> Tuple[str, str, list]:
+    """Create change statements in sql."""
+    column_str = ', '.join(
+        '{0}{1}{0}'.format(quote, getattr(field, 'code', field))
+        for field in changes.keys()
+    )
+    values = changes.values()
+    value_str = ', '.join(
+        getattr(value, 'literal_value', '${}'.format(i + 1 + offset))
+        for i, value in enumerate(values)
+    )
+    return column_str, value_str, values
+
+
+def group_changes(record: 'Model') -> Tuple[dict, dict]:
+    """Group changes into standard and translatable fields."""
+    standard = {}
+    i18n = {}
+
+    fields = record.__schema__.fields
+    for field_name, (_, new_value) in record.local_changes.items():
+        field = fields[field_name]
+        if field.test_flag(field.Flags.Translatable):
+            i18n[field] = new_value
+        else:
+            standard[field] = new_value
+
+    return standard, i18n
+
+
 def fields_to_sql(
-    model: 'Model',
+    model: Type['Model'],
     context: 'Context',
     *,
     quote: str=DEFAULT_QUOTE
@@ -312,7 +392,7 @@ def fields_to_sql(
 
 
 def query_to_sql(
-    model: 'Model',
+    model: Type['Model'],
     query: Union['Query', 'QueryGroup'],
     context: 'Context',
     *,
@@ -343,17 +423,21 @@ def query_to_sql(
         if callable(op):
             return op(field.code, len(values), quote)
 
-        pattern = '{q}{code}{q}{op}${index}'
+        pattern = '{q}{code}{q}{op}{value}'
         return pattern.format(
             q=quote,
             code=field.code,
             op=op,
-            index=len(values)
+            value=getattr(
+                query.value,
+                'literal_value',
+                '${}'.format(len(values))
+            )
         )
 
 
 def order_to_sql(
-    model: 'Model',
+    model: Type['Model'],
     order: Dict[str, Ordering],
     *,
     order_map: Dict[Ordering, str]=DEFAULT_ORDER_MAP,

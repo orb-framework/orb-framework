@@ -1,6 +1,17 @@
 """Define common decorator method."""
 
 
+class value_literal:
+    """Define literal valute to be used in the backend."""
+
+    def __init__(self, value):
+        self.literal_value = value
+
+    def __eq__(self, other):
+        """Check if this literal value equals the provided other value."""
+        return self.literal_value == other
+
+
 def virtual(cls, *args, **kw):
     """Generate a virtual member of the given class bound to a function."""
     def wrapper(func: callable):

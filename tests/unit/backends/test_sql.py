@@ -153,7 +153,7 @@ async def test_sql_delete_record_with_translation(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('name,engine', SQL_ENGINES.items())
-async def test_sql_insert_record(
+async def test_sql_create_record(
     mock_sql_backend,
     name,
     engine
@@ -180,7 +180,7 @@ async def test_sql_insert_record(
         assert await u.get('id') is None
         result = await u.save()
         mock.assert_called_with(
-            engine.INSERT_RECORD.format(
+            engine.CREATE_RECORD.format(
                 namespace=store.backend.default_namespace,
                 table='users',
                 column_a='first_name',
@@ -197,7 +197,7 @@ async def test_sql_insert_record(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('name,engine', SQL_ENGINES.items())
-async def test_sql_insert_i18n_record(
+async def test_sql_create_i18n_record(
     mock_sql_backend,
     name,
     engine
@@ -223,18 +223,21 @@ async def test_sql_insert_i18n_record(
         })
         assert await p.get('id') is None
         result = await p.save()
+        expected_sql = engine.CREATE_I18N_RECORD.format(
+            namespace=store.backend.default_namespace,
+            table='pages',
+            key_column='id',
+            column_a='code',
+            column_b='title',
+            column_c='content'
+        )
         mock.assert_called_with(
-            engine.INSERT_I18N_RECORD.format(
-                namespace=store.backend.default_namespace,
-                table='pages',
-                column_a='code',
-                column_b='title',
-                column_c='content'
-            ),
+            expected_sql,
             'some-page',
-            'en_US',
             'Some Page',
-            'Some Content'
+            'Some Content',
+            'en_US',
+            'inserted."id"'
         )
         assert await p.get('id') == 1
         assert result is True

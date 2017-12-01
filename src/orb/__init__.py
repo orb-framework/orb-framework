@@ -7,7 +7,10 @@ from .core.context import (  # noqa: F401
     ReturnType,
     make_context,
 )
-from .core.decorators import virtual  # noqa: F401
+from .core.decorators import (  # noqa: F401
+    value_literal,
+    virtual
+)
 from .core.field import Field  # noqa: F401
 from .core.index import Index  # noqa: F401
 from .core.model import Model  # noqa: F401

@@ -1,9 +1,6 @@
 """Defines a variety of helper functions."""
 
-try:  # python 3.6
-    from enum import Flag
-except ImportError:  # python 3.5
-    from aenum import Flag
+from aenum import Flag
 
 
 def enum_from_set(flags: Flag, options: set) -> Flag:
