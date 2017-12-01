@@ -77,8 +77,8 @@ async def test_sql_delete_record_by_key_index(
             engine.DELETE_RECORD_BY_KEY_INDEX.format(
                 namespace=store.backend.default_namespace,
                 table='group_users',
-                column_a='group_id',
-                column_b='user_id'
+                a='group_id',
+                b='user_id'
             ),
             1,
             2
@@ -183,9 +183,9 @@ async def test_sql_create_record(
             engine.CREATE_RECORD.format(
                 namespace=store.backend.default_namespace,
                 table='users',
-                column_a='first_name',
-                column_b='last_name',
-                column_c='username'
+                a='first_name',
+                b='last_name',
+                c='username'
             ),
             'Bob',
             'Dole',
@@ -226,10 +226,10 @@ async def test_sql_create_i18n_record(
         expected_sql = engine.CREATE_I18N_RECORD.format(
             namespace=store.backend.default_namespace,
             table='pages',
-            key_column='id',
-            column_a='code',
-            column_b='title',
-            column_c='content'
+            key='id',
+            a='code',
+            b='title',
+            c='content'
         )
         mock.assert_called_with(
             expected_sql,
@@ -245,7 +245,7 @@ async def test_sql_create_i18n_record(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('name,engine', SQL_ENGINES.items())
-async def test_sql_fetch_record_by_key_field(mock_sql_backend, name, engine):
+async def test_sql_get_record_by_key_field(mock_sql_backend, name, engine):
     """Test SQL engine getting a single record by field."""
     from orb import Model, Field
 
@@ -265,8 +265,8 @@ async def test_sql_fetch_record_by_key_field(mock_sql_backend, name, engine):
             engine.GET_RECORD_BY_KEY_FIELD.format(
                 namespace=store.backend.default_namespace,
                 table='users',
-                column_a='id',
-                column_b='username',
+                a='id',
+                b='username',
             ),
             1
         )
@@ -274,7 +274,56 @@ async def test_sql_fetch_record_by_key_field(mock_sql_backend, name, engine):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('name,engine', SQL_ENGINES.items())
-async def test_sql_fetch_record_by_key_index(mock_sql_backend, name, engine):
+async def test_sql_get_i18n_record_by_key_field(
+    mock_sql_backend,
+    name,
+    engine
+):
+    """Test SQL engine getting a single record by field."""
+    from orb import Model, Field
+
+    class Page(Model):
+        id = Field(flags={'Key'})
+        slug = Field()
+        text = Field(flags={'Translatable'})
+        title = Field(flags={'Translatable'})
+
+    async def fetch(sql, *values):
+        return [{
+            'id': 1,
+            'slug': 'some-slug',
+            'text': 'Some text',
+            'title': 'Some title'
+        }]
+
+    store, mock = mock_sql_backend(engine, side_effect=fetch)
+    with store:
+        u = await Page.fetch(1)
+        assert await u.gather('id', 'slug', 'text', 'title') == [
+            1,
+            'some-slug',
+            'Some text',
+            'Some title'
+        ]
+        sql = engine.GET_I18N_RECORD_BY_KEY_FIELD.format(
+            namespace=store.backend.default_namespace,
+            a='id',
+            b='slug',
+            c='text',
+            d='title',
+            i18n_table='pages_i18n',
+            table='pages'
+        )
+        mock.assert_called_with(
+            sql,
+            'en_US',
+            1
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('name,engine', SQL_ENGINES.items())
+async def test_sql_get_record_by_key_index(mock_sql_backend, name, engine):
     """Test SQL engine getting a single record by index."""
     from orb import Model, Field, Index
     from orb.core.collection import UNDEFINED
@@ -300,9 +349,9 @@ async def test_sql_fetch_record_by_key_index(mock_sql_backend, name, engine):
             engine.GET_RECORD_BY_KEY_INDEX.format(
                 namespace=store.backend.default_namespace,
                 table='users',
-                column_a='first_name',
-                column_b='last_name',
-                column_c='username'
+                a='first_name',
+                b='last_name',
+                c='username'
             )
         )
         assert await u.get('first_name') == 'Bob'
@@ -339,9 +388,9 @@ async def test_sql_get_record_with_column_as(
             engine.GET_RECORD_WITH_COLUMN_AS.format(
                 namespace=store.backend.default_namespace,
                 table='users',
-                column_a='id',
-                column_b='name',
-                label_b='username'
+                a='id',
+                b='name',
+                b_as='username'
             ),
             1
         )
@@ -432,8 +481,8 @@ async def test_sql_get_first_record(mock_sql_backend, name, engine):
             engine.GET_FIRST_RECORD_BY_KEY_FIELD.format(
                 namespace=store.backend.default_namespace,
                 table='users',
-                column_a='id',
-                column_b='username'
+                a='id',
+                b='username'
             )
         )
         assert await u.get('id') == 1
@@ -465,8 +514,8 @@ async def test_sql_get_last_record(mock_sql_backend, name, engine):
             engine.GET_LAST_RECORD_BY_KEY_FIELD.format(
                 namespace=store.backend.default_namespace,
                 table='users',
-                column_a='id',
-                column_b='username'
+                a='id',
+                b='username'
             )
         )
         assert await u.get('id') == 10
