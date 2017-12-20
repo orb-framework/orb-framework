@@ -35,11 +35,22 @@ class Query:
 
     def __init__(
         self,
+        *args,
         name: str='',
         model: str='',
         op: QueryOp=QueryOp.Is,
-        value: Any=None,
+        value: Any=None
     ):
+        if len(args) == 1:
+            arg = args[0]
+            if type(arg) is tuple:
+                model, name = arg
+            else:
+                name = arg
+        elif len(args) > 1:
+            msg = 'Query() takes 0-1 positional arguments but {} was given'
+            raise TypeError(msg.format(len(args)))
+
         self.model = model
         self.name = name
         self.op = op
@@ -72,6 +83,7 @@ class Query:
     def clone(self, values: dict=None):
         """Copy current query and return new object."""
         defaults = {
+            'model': self.model,
             'name': self.name,
             'op': self.op,
             'value': self.value,

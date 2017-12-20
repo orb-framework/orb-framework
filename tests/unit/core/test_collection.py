@@ -50,7 +50,7 @@ async def test_collection_nested_getter():
         employees = Collector(model='User')
 
     coll = User.__schema__.collectors['employees']
-    c = coll.get_collection([User(values={'username': 'bob'})])
+    c = coll.make_collection(records=[User(values={'username': 'bob'})])
     assert await c.get('first.username') == 'bob'
 
 

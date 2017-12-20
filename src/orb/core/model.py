@@ -3,9 +3,12 @@
 import asyncio
 from typing import Any, Dict, Tuple
 
+from .collector import Collector
 from .collection import Collection
 from .context import ReturnType, make_context
+from .field import Field
 from .model_type import ModelType
+from .reference import Reference
 from ..exceptions import ReadOnly
 
 
@@ -28,45 +31,55 @@ class Model(metaclass=ModelType):
         self.__state = {}
         self.__changes = {}
         self.__collections = {}
+        self.__references = {}
 
         # apply base state
         cls = type(self)
-        fields, collections = self._parse_items(
+        fields, references, collections = self._parse_items(
             state,
             constructor=lambda x: cls(state=x)
         )
         self.__state.update(self.__schema__.default_values)
         self.__state.update(fields)
+        self.__references.update(references)
         self.__collections.update(collections)
 
         # apply overrides
-        fields, collections = self._parse_items(
+        fields, references, collections = self._parse_items(
             values,
             constructor=lambda x: cls(values=x)
         )
         self.__changes.update(fields)
+        self.__references.update(references)
         self.__collections.update(collections)
 
     def _parse_items(self, values: dict, constructor: callable=None):
+        fields = {}
+        references = {}
+        collections = {}
         if not values:
-            return {}, {}
+            return fields, references, collections
 
         schema = self.__schema__
-        fields = {}
-        collections = {}
         for key, value in values.items():
-            field = schema.fields.get(key)
-            if field:
-                if not field.test_flag(field.Flags.Virtual):
+            schema_object = schema[key]
+            if isinstance(schema_object, Field):
+                if not schema_object.test_flag(Field.Flags.Virtual):
                     fields[key] = value
-            else:
-                collector = self.__schema__.collectors[key]
-                collections[key] = collector.get_collection(
+            elif isinstance(schema_object, Collector):
+                collections[key] = schema_object.make_collection(
+                    constructor=constructor,
                     records=value,
-                    constructor=constructor
+                    source=self
                 )
+            elif isinstance(schema_object, Reference):
+                model = schema_object.model
+                if not isinstance(value, model):
+                    references[key] = model(values=value)
+                else:
+                    references[key] = value
 
-        return fields, collections
+        return fields, references, collections
 
     async def delete(self, **context):
         """Delete this record from it's store."""
@@ -91,7 +104,10 @@ class Model(metaclass=ModelType):
         try:
             result = await self.get_value(curr_key, default)
         except KeyError:
-            result = await self.get_collection(curr_key, default)
+            try:
+                result = await self.get_reference(curr_key, default)
+            except KeyError:
+                result = await self.get_collection(curr_key, default)
 
         if next_key and result is not None:
             return await result.get(next_key)
@@ -105,7 +121,7 @@ class Model(metaclass=ModelType):
             return self.__collections[key]
         except KeyError:
             collector = self.__schema__.collectors[key]
-            collection = await collector.collect_by_record(self)
+            collection = await collector.collect(self)
             self.__collections[key] = collection
             return collection
 
@@ -122,6 +138,22 @@ class Model(metaclass=ModelType):
         for field in self.__schema__.key_fields:
             out[getattr(field, key_property)] = await self.get(field.name)
         return out
+
+    async def get_reference(self, key: str, default: 'Model'=None) -> 'Model':
+        """Return the reference for the given key."""
+        ref = self.__schema__.references[key]
+        try:
+            return self.__references[key]
+        except KeyError:
+            if ref.source:
+                field = self.__schema__[ref.source]
+                ref_model = field.refers_to_model
+                ref_field = field.refers_to_field
+                value = await self.get(ref.source)
+                reference = await ref_model.fetch({ref_field: value})
+                self.__references[key] = reference
+                return reference
+            return None
 
     async def get_value(self, key: str, default: Any=None) -> Any:
         """Return the record's value for a given field."""
@@ -178,27 +210,26 @@ class Model(metaclass=ModelType):
             return True
         return False
 
-    async def set(self, key: str, value: Any):
+    async def set(self, key: str, value: Any, ignore_method: bool=False):
         """Set the value for the given key."""
         target_key, _, field_key = key.rpartition('.')
-        if not target_key:
-            try:
-                field = self.__schema__.fields[field_key]
-            except KeyError:
-                coll = self.__schema__.collectors[field_key]
-                if coll and coll.settermethod:
-                    await coll.settermethod(self, value)
-                self.__collections[key] = value
-            else:
-                if field.settermethod:
-                    return await field.settermethod(self, value)
-                elif self.__state.get(field_key) is not value:
-                    self.__changes[field_key] = value
-                else:
-                    self.__changes.pop(field_key)
-        else:
+        if target_key:
             target = await self.get(target_key)
             await target.set(field_key, value)
+        else:
+            schema = self.__schema__
+            schema_object = schema[field_key]
+            settermethod = schema_object.settermethod
+            if settermethod and not ignore_method:
+                await settermethod(self, value)
+            elif isinstance(schema_object, Reference):
+                self.__references[field_key] = value
+            elif isinstance(schema_object, Collection):
+                self.__collections[field_key] = value
+            elif self.__state.get(field_key) is not value:
+                self.__changes[field_key] = value
+            else:
+                self.__changes.pop(field_key)
 
     async def update(self, values: dict):
         """Update a number of values by the given dictionary."""
@@ -219,7 +250,6 @@ class Model(metaclass=ModelType):
         """Fetch a single record from the store for the given key."""
         from .query import Query as Q
 
-        # fetch directly from a key
         q = Q()
         key_fields = cls.__schema__.key_fields
         if type(key) in (list, tuple):
@@ -228,7 +258,10 @@ class Model(metaclass=ModelType):
             for i, field in key_fields:
                 q &= Q(field.name) == key[i]
 
-        # fetch from other keyable fields
+        elif type(key) is dict:
+            for field, value in key.items():
+                q &= Q(field.name) == value
+
         else:
             if len(key_fields) == 1:
                 q |= Q(key_fields[0].name) == key
@@ -263,10 +296,7 @@ class Model(metaclass=ModelType):
     @classmethod
     def find_model(cls, name):
         """Find subclass model by name."""
-        for sub_cls in cls.__subclasses__():
-            if sub_cls.__name__ == name:
-                return sub_cls
-            found = sub_cls.find_model(name)
-            if found:
-                return found
+        sub_model = cls.registry.get(name)
+        if sub_model and issubclass(sub_model, cls):
+            return sub_model
         return None

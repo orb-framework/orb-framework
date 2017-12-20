@@ -3,11 +3,13 @@
 from orb import value_literal
 
 from .base import (
-    DEFAULT_OP_MAP,
-    DEFAULT_ORDER_MAP,
     SqlBackend,
     changes_to_sql,
     resolve_namespace
+)
+from .utils import (
+    DEFAULT_OP_MAP,
+    DEFAULT_ORDER_MAP
 )
 
 

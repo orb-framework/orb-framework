@@ -35,7 +35,7 @@ def args_to_sql(
     kwargs: dict,
     *,
     joiner: str=', ',
-    quote: str=DEFAULT_QUOTE,
+    quote: str=DEFAULT_QUOTE
 ) -> Tuple[str, list]:
     """Generate argument tuple from a dictionary."""
     pattern = '{q}{key}{q}={value}'
@@ -175,7 +175,7 @@ def order_to_sql(
     order: Dict[str, Ordering],
     *,
     order_map: Dict[Ordering, str]=DEFAULT_ORDER_MAP,
-    quote: str=DEFAULT_QUOTE,
+    quote: str=DEFAULT_QUOTE
 ) -> str:
     """Convert ordering information to SQL."""
     if not order:

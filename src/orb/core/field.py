@@ -4,7 +4,7 @@ import inflection
 
 from aenum import IntFlag, auto
 
-from typing import Any, Union
+from typing import Any, Type, Union
 
 from .context import Ordering
 from ..utils import enum_from_set
@@ -48,6 +48,7 @@ class Field:
         label: str='',
         name: str='',
         querymethod: callable=None,
+        refers_to: str=None,
         settermethod: callable=None,
         shortcut: str=''
     ):
@@ -59,6 +60,7 @@ class Field:
         self.gettermethod = gettermethod
         self.name = name
         self.querymethod = querymethod
+        self.refers_to = refers_to
         self.settermethod = settermethod
         self.shortcut = shortcut
 
@@ -98,6 +100,22 @@ class Field:
         self.gettermethod = func
         return func
 
+    def get_refers_to_field(self) -> 'Field':
+        """Return the remote field this instance refers to, if any."""
+        model = self.refers_to_model
+        if model:
+            _, field_name = self.refers_to.split('.', 1)
+            return model.__schema__.fields[field_name]
+        return None
+
+    def get_refers_to_model(self) -> Type['Model']:
+        """Return the model this field refers to, if any."""
+        if self.refers_to:
+            from .model import Model
+            model_name, _ = self.refers_to.split('.', 1)
+            return Model.find_model(model_name)
+        return None
+
     def set_code(self, code: str):
         """Set code for this field."""
         self._code = code
@@ -127,3 +145,5 @@ class Field:
     code = property(get_code, set_code)
     default = property(get_default, set_default)
     label = property(get_label, set_label)
+    refers_to_model = property(get_refers_to_model)
+    refers_to_field = property(get_refers_to_field)

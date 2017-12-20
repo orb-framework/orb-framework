@@ -1,10 +1,9 @@
 """Define Collector class."""
 from aenum import IntFlag, auto
 
-from typing import Iterable
+from typing import Iterable, Type, Union
 
 from .collection import Collection
-from .model import Model
 
 
 class CollectorFlags(IntFlag):
@@ -23,27 +22,37 @@ class Collector:
         *,
         code: str=None,
         flags: CollectorFlags=CollectorFlags(0),
+        source: str=None,
         gettermethod: callable=None,
         model: str=None,
         name: str=None,
         querymethod: callable=None,
-        settermethod: callable=None
+        settermethod: callable=None,
+        through: str=None,
+        target: str=None
     ):
-        self.code = code
-        self.gettermethod = gettermethod
         self._model = model
+        self.code = code
+        self.source = source
+        self.gettermethod = gettermethod
         self.name = name
         self.querymethod = querymethod
         self.settermethod = settermethod
+        self.through = through
+        self.target = target
 
-    async def collect_by_record(self, record: Model) -> Collection:
+    async def collect(
+        self,
+        source: 'Model',
+        ignore_method: bool=False,
+    ) -> Collection:
         """Create collection for specific record."""
-        if self.gettermethod:
-            return await self.gettermethod(record)
+        if self.gettermethod and not ignore_method:
+            return await self.gettermethod(source)
         return Collection(
             collector=self,
             model=self._model,
-            source=record,
+            source=source,
         )
 
     def getter(self, func: callable) -> callable:
@@ -51,10 +60,12 @@ class Collector:
         self.gettermethod = func
         return func
 
-    def get_collection(
+    def make_collection(
         self,
+        *,
+        constructor: callable=None,
         records: Iterable=None,
-        constructor: callable=None
+        source: 'Model'=None,
     ) -> Collection:
         """Create new collection instance from value."""
         if isinstance(records, Collection):
@@ -71,17 +82,19 @@ class Collector:
                 collector=self,
                 model=self._model,
                 records=records,
+                source=source
             )
         return Collection(
             collector=self,
             model=self._model,
             records=records,
+            source=source
         )
 
-    @property
-    def model(self):
+    def get_model(self):
         """Return Model class instance associated with this collector."""
         if type(self._model) is str:
+            from .model import Model
             return Model.find_model(self._model)
         return None
 
@@ -90,7 +103,43 @@ class Collector:
         self.querymethod = func
         return func
 
+    @property
+    def source_field(self) -> 'Field':
+        """Return the source field."""
+        if not self.source:
+            return None
+
+        model = self.through_model or self.model
+        if model:
+            return model.__schema__[self.source]
+        return None
+
     def setter(self, func: callable) -> callable:
         """Assign settermethod via decorator."""
         self.settermethod = func
         return func
+
+    def set_model(self, model: Union[str, Type['Model']]):
+        """Assign model type for this collector."""
+        self._model = model
+
+    @property
+    def target_field(self) -> 'Field':
+        """Return the target field."""
+        if not self.target:
+            return None
+
+        model = self.through_model or self.model
+        if model:
+            return model.__schema__[self.target]
+        return None
+
+    @property
+    def through_model(self) -> 'Field':
+        """Return the through model for a piped collector."""
+        if type(self.through) is str:
+            from .model import Model
+            return Model.find_model(self.through)
+        return self.through
+
+    model = property(get_model, set_model)

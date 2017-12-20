@@ -1,7 +1,7 @@
 """Define Schema class."""
 import inflection
 
-from typing import Dict, List
+from typing import Any, Dict, List, Union
 
 
 class Schema:
@@ -21,6 +21,7 @@ class Schema:
         self.local_collectors = {}
         self.local_fields = {}
         self.local_indexes = {}
+        self.local_references = {}
         self.name = name
         self.namespace = namespace
 
@@ -28,6 +29,23 @@ class Schema:
         self._key_fields = None
         self._label = label
         self._resource_name = resource_name
+
+    def __getitem__(
+        self,
+        key: str
+    ) -> Union['Collector', 'Field', 'Reference']:
+        """Shortcut to getting collectors, fields and references by name."""
+        try:
+            return self.fields[key]
+        except KeyError:
+            try:
+                return self.collectors[key]
+            except KeyError:
+                try:
+                    return self.references[key]
+                except KeyError:
+                    pass
+        raise KeyError(key)
 
     @property
     def collectors(self) -> dict:
@@ -55,6 +73,17 @@ class Schema:
             for field in self.fields.values()
             if not field.test_flag(field.Flags.Virtual)
         }
+
+    def get(
+        self,
+        key: str,
+        default: Any=None
+    ) -> Union['Collector', 'Field', 'Reference']:
+        """Get a schema object by name."""
+        try:
+            return self[key]
+        except KeyError:
+            return default
 
     @property
     def has_translations(self) -> bool:
@@ -110,6 +139,16 @@ class Schema:
     def label(self) -> str:
         """Reurn the label for this schema."""
         return self._label or inflection.titelize(self.name)
+
+    @property
+    def references(self) -> dict:
+        """Return all references associated with this schema."""
+        output = {}
+        if self.inherits:
+            for schema in self.inherits:
+                output.update(schema.local_references)
+        output.update(self.local_references)
+        return output
 
     @property
     def resource_name(self) -> str:
