@@ -1,4 +1,5 @@
 """Tests for the Context class."""
+import pytest
 
 
 def test_context_creation():
@@ -96,3 +97,19 @@ def test_context_page_limiting():
 
     assert context.start == 100
     assert context.limit == 100
+
+
+@pytest.mark.parametrize('options,base_context,expected', (
+    ({'include': 'a,b,b.c'}, None, {'a': {}, 'b': {'c': {}}}),
+    ({'fields': 'a,b.c,b.d,b.e.f'}, None, {'b': {'e': {}}}),
+    ({'include': 'a', 'fields': 'a.b'}, None, {'a': {}}),
+    ({'include': 'a'}, {'include': 'b'}, {'a': {}, 'b': {}})
+))
+def test_context_inclusion(options, base_context, expected):
+    """Test including references from the context."""
+    from orb import make_context
+
+    if base_context:
+        options['context'] = make_context(**base_context)
+    context = make_context(**options)
+    assert context.include == expected

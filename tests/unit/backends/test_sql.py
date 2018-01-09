@@ -228,14 +228,14 @@ async def test_sql_create_i18n_record(
             table='pages',
             key='id',
             a='code',
-            b='title',
-            c='content'
+            b='content',
+            c='title'
         )
         mock.assert_called_with(
             expected_sql,
             'some-page',
-            'Some Page',
             'Some Content',
+            'Some Page',
             'en_US',
             'inserted."id"'
         )

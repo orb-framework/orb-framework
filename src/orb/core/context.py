@@ -2,6 +2,8 @@
 from enum import Enum
 from typing import Union
 
+from dotted.utils import dot
+
 from .store import current_store
 
 DEFAULT_LOCALE = 'en_US'
@@ -28,6 +30,7 @@ class Context:
     def __init__(
         self,
         *,
+        include: 'DottedDict'=None,
         distinct: list=None,
         fields: list=None,
         force_namespace: bool=False,
@@ -44,6 +47,7 @@ class Context:
         timezone: str=None,
         where: 'Query'=None
     ):
+        self.include = include or dot({})
         self.distinct = distinct
         self.force_namespace = force_namespace
         self.fields = fields
@@ -93,6 +97,26 @@ class Context:
     store = property(get_store, set_store)
 
 
+def _merge_include(options: dict, base_context: Context) -> 'DottedDict':
+    """Return trie containing the hierarchy of includes."""
+    out = dot({})
+    out.update(base_context.include if base_context else {})
+    option_include = options.get('include', {})
+    option_fields = options.get('fields', [])
+    if type(option_fields) is str:
+        option_fields = option_fields.split(',')
+    if type(option_include) is str:
+        for incl in option_include.split(','):
+            out.setdefault(incl, {})
+    elif type(option_include) in (list, tuple):
+        for incl in option_include:
+            out.setdefault(incl, {})
+    for field in option_fields:
+        if '.' in field:
+            out.setdefault(field.rpartition('.')[0], {})
+    return out
+
+
 def _merge_distinct(options: dict, base_context: Context) -> list:
     """Return distinct joined from option and base context."""
     try:
@@ -107,18 +131,19 @@ def _merge_distinct(options: dict, base_context: Context) -> list:
 
 def _merge_fields(options: dict, base_context: Context) -> list:
     """Return new fields based on input and context."""
-    try:
-        fields = options['fields']
-    except KeyError:
-        fields = base_context.fields if base_context else None
-    else:
-        if type(fields) is str:
-            fields = fields.split(',')
+    option_fields = options.get('fields')
+    base_fields = base_context.fields if base_context else None
+    if type(option_fields) is str:
+        option_fields = option_fields.split(',')
 
-        if fields and base_context and base_context.fields:
-            base_fields = [f for f in base_context.fields if f not in fields]
-            return fields + base_fields
-    return fields
+    if option_fields and base_fields:
+        return option_fields + [
+            f for f in base_fields if f not in option_fields
+        ]
+    elif option_fields:
+        return option_fields
+    else:
+        return base_fields
 
 
 def _merge_limit(options: dict, base_context: Context) -> int:
@@ -245,18 +270,19 @@ def make_context(**options) -> Context:
     return Context(
         distinct=_merge_distinct(options, base_context),
         fields=_merge_fields(options, base_context),
-        locale=_merge_locale(options, base_context),
+        include=_merge_include(options, base_context),
         limit=_merge_limit(options, base_context),
+        locale=_merge_locale(options, base_context),
         namespace=_merge_namespace(options, base_context),
         order=_merge_order(options, base_context),
-        page=_merge_page(options, base_context),
         page_size=_merge_page_size(options, base_context),
+        page=_merge_page(options, base_context),
         returning=_merge_returning(options, base_context),
         scope=_merge_scope(options, base_context),
         start=_merge_start(options, base_context),
         store=_merge_store(options, base_context),
         timezone=_merge_timezone(options, base_context),
-        where=_merge_query(options, base_context),
+        where=_merge_query(options, base_context)
     )
 
 

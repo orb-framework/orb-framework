@@ -267,7 +267,8 @@ class SqlBackend(metaclass=ABCMeta):
                 table=schema.i18n_name,
             ))
 
-        where = query_to_sql(
+        where = await query_to_sql(
+            self,
             model,
             context.where,
             context,

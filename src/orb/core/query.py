@@ -1,7 +1,7 @@
 """Define Query class type."""
 
 from enum import Enum
-from typing import Any, Union
+from typing import Any, Type, Union
 
 
 class QueryOp(Enum):
@@ -37,7 +37,7 @@ class Query:
         self,
         *args,
         name: str='',
-        model: str='',
+        model: Union[str, Type['Model']]='',
         op: QueryOp=QueryOp.Is,
         value: Any=None
     ):
@@ -51,7 +51,7 @@ class Query:
             msg = 'Query() takes 0-1 positional arguments but {} was given'
             raise TypeError(msg.format(len(args)))
 
-        self.model = model
+        self._model = model
         self.name = name
         self.op = op
         self.value = value
@@ -83,7 +83,7 @@ class Query:
     def clone(self, values: dict=None):
         """Copy current query and return new object."""
         defaults = {
-            'model': self.model,
+            'model': self._model,
             'name': self.name,
             'op': self.op,
             'value': self.value,
@@ -91,7 +91,20 @@ class Query:
         defaults.update(values or {})
         return type(self)(**defaults)
 
+    def get_model(self) -> Type['Model']:
+        """Return model type associated with this query, if any."""
+        if type(self._model) is str:
+            from .model import Model
+            return Model.find_model(self._model)
+        return self._model
+
     @property
     def is_null(self) -> bool:
         """Return whether or not this query object is null."""
         return not(self.name or self.model)
+
+    def set_model(self, model: Union[str, Type['Model']]):
+        """Set model type instance for this query."""
+        self._model = model
+
+    model = property(get_model, set_model)

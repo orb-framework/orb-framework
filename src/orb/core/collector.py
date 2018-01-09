@@ -4,6 +4,7 @@ from aenum import IntFlag, auto
 from typing import Iterable, Type, Union
 
 from .collection import Collection
+from .query import Query as Q
 
 
 class CollectorFlags(IntFlag):
@@ -43,16 +44,25 @@ class Collector:
 
     async def collect(
         self,
-        source: 'Model',
+        record: 'Model',
         ignore_method: bool=False,
     ) -> Collection:
         """Create collection for specific record."""
         if self.gettermethod and not ignore_method:
-            return await self.gettermethod(source)
+            return await self.gettermethod(record)
+
+        q = None
+        if self.through:
+            q = Q((self.through, self.source)) == record
+            q &= Q((self.through, self.target)) == Q(self._model)
+        elif self.source:
+            q = Q((self._model, self.source)) == record
+
         return Collection(
             collector=self,
             model=self._model,
-            source=source,
+            source=record,
+            where=q,
         )
 
     def getter(self, func: callable) -> callable:
@@ -65,7 +75,7 @@ class Collector:
         *,
         constructor: callable=None,
         records: Iterable=None,
-        source: 'Model'=None,
+        source: 'Model'=None
     ) -> Collection:
         """Create new collection instance from value."""
         if isinstance(records, Collection):

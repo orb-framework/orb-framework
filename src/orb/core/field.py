@@ -68,6 +68,12 @@ class Field:
         self._default = default
         self._label = label
 
+    def __lt__(self, other) -> int:
+        """Compare one field to another for sorting."""
+        if type(other) is Field:
+            return self.name < other.name
+        return True
+
     def get_code(self) -> str:
         """Return code for this field.
 

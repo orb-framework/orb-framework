@@ -150,7 +150,8 @@ async def test_reference_loading_from_store(mocker):
         if model is User:
             return [{
                 'id': 1,
-                'username': 'jdoe'
+                'username': 'jdoe',
+                'role_id': 1
             }]
         elif model is Role:
             return [{
@@ -176,3 +177,126 @@ async def test_reference_loading_from_store(mocker):
         values = await comment.gather('user.role.id', 'user.role.name')
         assert values == [1, 'admin']
         assert mock_getter.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_reference_loading_from_store_without_source_value(mocker):
+    """Test loading reference from store."""
+    from orb import Store, Model, Field, Reference
+
+    class Role(Model):
+        id = Field()
+        name = Field()
+
+    class User(Model):
+        id = Field()
+        username = Field()
+        role_id = Field(refers_to='Role.id')
+        role = Reference(model='Role', source='role_id')
+
+    class Comment(Model):
+        id = Field()
+        text = Field()
+        user_id = Field(refers_to='User.id')
+        user = Reference(model='User', source='user_id')
+
+    comment = Comment(state={
+        'id': 1,
+        'text': 'Hello, world',
+        'user_id': 1
+    })
+
+    async def get_records(model, context):
+        if model is User:
+            return [{
+                'id': 1,
+                'username': 'jdoe'
+            }]
+        elif model is Role:
+            return [{
+                'id': 1,
+                'name': 'admin'
+            }]
+        return []
+
+    store = Store()
+    mock_getter = mocker.patch.object(
+        store,
+        'get_records',
+        side_effect=get_records
+    )
+
+    with store:
+        assert await comment.get('user_id') == 1
+        assert mock_getter.call_count == 0
+        assert await comment.get('user.id') == 1
+        assert mock_getter.call_count == 1
+        assert await comment.get('user.username') == 'jdoe'
+        assert mock_getter.call_count == 1
+        values = await comment.gather('user.role.id', 'user.role.name')
+        assert values == [None, None]
+        assert mock_getter.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_reference_nested_loading_from_store(mocker):
+    """Test loading reference from store."""
+    from orb import Store, Model, Field, Reference
+
+    class Role(Model):
+        id = Field()
+        name = Field()
+
+    class User(Model):
+        id = Field()
+        username = Field()
+        role_id = Field(refers_to='Role.id')
+        role = Reference(model='Role', source='role_id')
+
+    class Comment(Model):
+        id = Field()
+        text = Field()
+        user_id = Field(refers_to='User.id')
+        user = Reference(model='User', source='user_id')
+
+    comment = Comment(state={
+        'id': 1,
+        'text': 'Hello, world',
+        'user_id': 1
+    })
+
+    async def get_records(model, context):
+        if model is User:
+            return [{
+                'id': 1,
+                'username': 'jdoe',
+                'role_id': 1,
+                'role': {
+                    'id': 1,
+                    'name': 'admin'
+                }
+            }]
+        elif model is Role:
+            return [{
+                'id': 1,
+                'name': 'admin'
+            }]
+        return []
+
+    store = Store()
+    mock_getter = mocker.patch.object(
+        store,
+        'get_records',
+        side_effect=get_records
+    )
+
+    with store:
+        assert await comment.get('user_id') == 1
+        assert mock_getter.call_count == 0
+        assert await comment.get('user.id') == 1
+        assert mock_getter.call_count == 1
+        assert await comment.get('user.username') == 'jdoe'
+        assert mock_getter.call_count == 1
+        values = await comment.gather('user.role.id', 'user.role.name')
+        assert values == [1, 'admin']
+        assert mock_getter.call_count == 1

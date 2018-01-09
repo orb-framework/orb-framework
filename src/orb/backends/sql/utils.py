@@ -1,6 +1,8 @@
 """Define useful utility methods for manipulating sql calls."""
+from collections import OrderedDict
 from typing import Any, Dict, List, Tuple, Type, Union
 
+from orb.core.model import Model
 from orb.core.context import Ordering
 from orb.core.query import Query
 from orb.core.query_group import QueryGroup
@@ -75,11 +77,11 @@ def changes_to_sql(
 
 def group_changes(record: 'Model') -> Tuple[dict, dict]:
     """Group changes into standard and translatable fields."""
-    standard = {}
-    i18n = {}
+    standard = OrderedDict()
+    i18n = OrderedDict()
 
     fields = record.__schema__.fields
-    for field_name, (_, new_value) in record.local_changes.items():
+    for field_name, (_, new_value) in sorted(record.local_changes.items()):
         field = fields[field_name]
         if field.test_flag(field.Flags.Translatable):
             i18n[field] = new_value
@@ -125,7 +127,8 @@ def fields_to_sql(
     return fields, columns
 
 
-def query_to_sql(
+async def query_to_sql(
+    backend: 'StoreBackend',
     model: Type['Model'],
     query: Union['Query', 'QueryGroup'],
     context: 'Context',
@@ -139,23 +142,27 @@ def query_to_sql(
         return ''
     elif isinstance(query, QueryGroup):
         joiner = op_map[query.op]
-        return ' {} '.format(joiner).join(
-            query_to_sql(
-                model,
-                sub_query,
-                context,
-                op_map=op_map,
-                quote=quote,
-                values=values
+        sub_queries = []
+        for sub_query in query.queries:
+            sub_queries.append(
+                await query_to_sql(
+                    backend,
+                    model,
+                    sub_query,
+                    context,
+                    op_map=op_map,
+                    quote=quote,
+                    values=values
+                )
             )
-            for sub_query in query.queries
-        )
+        return ' {} '.format(joiner).join(sub_queries)
     else:
         op = op_map[query.op]
         field = model.__schema__.fields[query.name]
-        values.append(query.value)
+        value = await prepare_value(backend, field, query.value)
+        values.append(value)
         if callable(op):
-            return op(field.code, len(values), quote)
+            return await op(field.code, len(values), quote)
 
         pattern = '{q}{code}{q}{op}{value}'
         return pattern.format(
@@ -163,7 +170,7 @@ def query_to_sql(
             code=field.code,
             op=op,
             value=getattr(
-                query.value,
+                value,
                 'literal_value',
                 '${}'.format(len(values))
             )
@@ -189,3 +196,14 @@ def order_to_sql(
             order=order_map[ordering]
         ) for field_name, ordering in order
     )
+
+
+async def prepare_value(
+    backend: 'StoreBackend',
+    field: 'Field',
+    value: Any,
+) -> Any:
+    """Prepare the value to be stored to the backend."""
+    if isinstance(value, Model):
+        return await value.get_key()
+    return value

@@ -171,3 +171,24 @@ def test_collector_pipe():
     assert cat_schema['pages'].source_field.name == 'category_id'
     assert cat_schema['pages'].target_field.name == 'page_id'
     assert cat_schema['pages'].through_model is PageCategory
+
+
+@pytest.mark.asyncio
+async def test_collector_reverse_lookup_collection_context():
+    """Test to validate a proper context is generated for a lookup."""
+    from orb import Model, Collector, Field, Query
+
+    class Page(Model):
+        id = Field(flags={'Key'})
+        parent_id = Field(refers_to='Page.id')
+        children = Collector(model='Page', source='parent_id')
+
+    page = Page(state={'id': 1})
+    children = await page.get('children')
+
+    assert children.model is Page
+    assert children.context.where is not None
+    assert children.context.where.model is Page
+    assert children.context.where.name is 'parent_id'
+    assert children.context.where.op is Query.Op.Is
+    assert children.context.where.value is page

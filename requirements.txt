@@ -1,2 +1,3 @@
 aenum
+dotted
 inflection

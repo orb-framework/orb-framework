@@ -1,6 +1,7 @@
 """Define Model class."""
 
 import asyncio
+from collections import OrderedDict
 from typing import Any, Dict, Tuple
 
 from .collector import Collector
@@ -134,23 +135,26 @@ class Model(metaclass=ModelType):
 
     async def get_key_dict(self, key_property: str='name') -> dict:
         """Return the key values for this record."""
-        out = {}
-        for field in self.__schema__.key_fields:
+        out = OrderedDict()
+        for field in sorted(self.__schema__.key_fields):
             out[getattr(field, key_property)] = await self.get(field.name)
         return out
 
     async def get_reference(self, key: str, default: 'Model'=None) -> 'Model':
         """Return the reference for the given key."""
-        ref = self.__schema__.references[key]
         try:
             return self.__references[key]
         except KeyError:
+            ref = self.__schema__.references[key]
             if ref.source:
                 field = self.__schema__[ref.source]
                 ref_model = field.refers_to_model
                 ref_field = field.refers_to_field
                 value = await self.get(ref.source)
-                reference = await ref_model.fetch({ref_field: value})
+                if value is not None:
+                    reference = await ref_model.fetch({ref_field: value})
+                else:
+                    reference = None
                 self.__references[key] = reference
                 return reference
             return None
